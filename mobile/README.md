@@ -4,6 +4,8 @@ A phone and tablet fork of [iRig Lab](../README.md): the same tuner, chord finde
 loop station, rebuilt for touchscreens. It is an installable web app (PWA) that runs on
 **iPhone/iPad (Safari)** and **Android (Chrome)** from one codebase, with no app store needed.
 
+**Open it on your phone: [https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/](https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/)**
+
 It works with any microphone the phone can use:
 
 | Input | Notes |
@@ -48,12 +50,14 @@ by ear: record a few clicks along with the metronome and adjust until overdubs l
 
 Phones only allow the microphone on **HTTPS** pages, so the app has to be served over HTTPS:
 
-- **Hosted (recommended):** publish the `mobile/` folder on any static HTTPS host, e.g. GitHub
-  Pages. Open the URL on the phone, tap **Tap to start**, and allow the microphone. Then install it:
+- **Published version (recommended):** [https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/](https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/). It is served from this repository by
+  GitHub Pages and updates with every push to `main`. Open it on the phone, tap **Tap to start**,
+  and allow the microphone. Then install it:
   - *iPhone:* Share › **Add to Home Screen**.
   - *Android:* the **Install** button in Settings, or the browser menu › *Install app*.
 
-  It then opens full-screen and works offline.
+  It then opens full-screen and works offline. To host your own copy, publish the `mobile/`
+  folder on any static HTTPS host.
 - **From this computer, over Wi-Fi:**
   ```bash
   python3 serve.py --https
