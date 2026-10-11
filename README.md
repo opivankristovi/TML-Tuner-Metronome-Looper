@@ -82,9 +82,18 @@ automatically when it's listed.
 | `M` | Metronome on/off |
 | `T` | Tap tempo |
 
-**Input bar**: device, channel (Mix/Left/Right), software gain, a level meter with a clip
-light, and **Monitor** to hear the input through the computer (this adds latency; most
+**Input bar**: input device, channel (Mix/Left/Right), software gain, a level meter with a
+clip light, and **Monitor** to hear the input through the computer (this adds latency; most
 players monitor through an amp or the iRig's headphone out instead).
+
+**Switching inputs** (iRig, USB microphone, or another interface):
+- Pick it under **Input**. Instrument interfaces are marked 🎸 and microphones 🎤.
+- The list updates when devices are plugged in or out. A newly connected input gets a **Use it**
+  button. If the input in use disappears, the app tells you.
+- **Gain and channel are remembered per device**, so a quiet microphone and the iRig each keep their own level.
+- The current input keeps working until the new one is open. If a device can't be opened, the
+  app stays on the working one and remembers that choice.
+- With a microphone, the silence gate follows the room's noise floor, so background noise doesn't show up as notes.
 
 ## How it works
 
@@ -115,6 +124,9 @@ How the chord analysis works:
   `cannot set freq 48000 to ep 0x82` mean the USB port can't run the iRig HD's full-speed audio
   stream. Unplug and replug it, ideally through a USB 2.0 hub or into a different port, then
   press **Restart audio**.
+- **Switching inputs hangs for ~30 s**: Chromium opens one input at a time, and a device that
+  doesn't respond (like the iRig HD with the USB error above) holds the queue until the browser
+  gives up after about 30 s. The app says so while it waits, and keeps the previous input running.
 - **No iRig in the Input list**: run `pactl list cards short` and check that the card exists,
   then `pactl set-card-profile alsa_card.usb-IK_Multimedia_iRig_HD-00 pro-audio`.
 - **Level too low**: turn up the gain wheel on the iRig HD first. The software Gain slider comes after the converter.

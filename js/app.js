@@ -4,13 +4,31 @@ import { renderFretboard } from './fretboard.js';
 import { createStation } from './station.js';
 
 const $ = (id) => document.getElementById(id);
-const GATE = 0.0025; // RMS below this is treated as silence
+const GATE = 0.0025; // RMS below this is always treated as silence
+
+// Microphones pick up room noise, so the silence gate follows each input's noise floor:
+// the quietest level of the last 8 seconds (minimum per half-second bucket), so it adapts
+// quickly but can never ratchet up while you play.
+const noise = { floor: 0, buckets: [], bucketStart: 0 };
+function trackNoiseFloor(buf, now) {
+  const r = rmsOf(buf, 2048);
+  if (r <= 0) return; // dead input
+  if (!noise.buckets.length || now - noise.bucketStart > 500) {
+    noise.buckets.push(r);
+    noise.bucketStart = now;
+    if (noise.buckets.length > 16) noise.buckets.shift();
+  } else {
+    noise.buckets[noise.buckets.length - 1] = Math.min(noise.buckets[noise.buckets.length - 1], r);
+  }
+  noise.floor = Math.min(...noise.buckets);
+}
+const gate = () => Math.min(0.01, Math.max(GATE, noise.floor * 2));
 
 // ------------------------------------------------------------- settings
 const settings = Object.assign(
   {
     deviceId: '', channel: 'mix', gain: 0, monitor: false, monitorVol: 0.8, instrument: 'gtr-std', a4: 440, tab: 'tuner', anMode: 'auto', sens: 0.22,
-    loopVol: 1, latOffset: 0, bpm: 100, rhythm: 'click-4', metronome: false, metroVol: 0.7, countIn: true, quantize: 'bar', recBars: 0, trackGains: [1, 1, 1],
+    loopVol: 1, latOffset: 0, bpm: 100, rhythm: 'click-4', metronome: false, metroVol: 0.7, countIn: true, quantize: 'bar', recBars: 0, trackGains: [1, 1, 1], devices: {},
   },
   load()
 );
@@ -22,7 +40,7 @@ const station = createStation({ settings, save, banner });
 const inst = () => INSTRUMENTS.find((i) => i.id === settings.instrument) || INSTRUMENTS[0];
 
 // ---------------------------------------------------------------- audio
-const audio = { ctx: null, stream: null, source: null, splitter: null, input: null, analyser: null, monitor: null, buf: null };
+const audio = { ctx: null, stream: null, source: null, splitter: null, input: null, analyser: null, monitor: null, buf: null, devices: [] };
 let pitch4k, pitch8k, poly;
 
 async function buildGraph() {
@@ -41,33 +59,87 @@ async function buildGraph() {
   applyGain(); applyMonitor();
 }
 
+let startGen = 0;
+let pendingOpen = null; // label of a device whose open hasn't settled yet
+
+const deviceLabel = (id) => audio.devices.find((d) => d.deviceId === id)?.label || (id && id !== 'default' ? 'the selected input' : 'the default input');
+
+// Opens the selected input. Safe to call again while running: only the latest call wins.
+// The current input keeps working until the new one is open.
 async function startAudio() {
+  const gen = ++startGen;
+  if (!audio.devices.length) await listDevices();
+  const target = settings.deviceId;
+  const name = escapeHtml(deviceLabel(target));
+  banner(pendingOpen
+    ? `Waiting for <b>${escapeHtml(pendingOpen)}</b> to respond before opening <b>${name}</b>… (the browser opens one input at a time)`
+    : `Opening <b>${name}</b>…`);
+  const slow = setTimeout(() => {
+    if (gen === startGen) banner(`<b>${name}</b> isn't responding. The browser gives up after about 30 s` + (audio.stream ? '; the current input keeps working meanwhile.' : '.'), true);
+  }, 3000);
+  const opening = deviceLabel(target);
+  pendingOpen ??= opening;
   try {
-    if (!audio.ctx) await buildGraph();
+    audio.ready ??= buildGraph();
+    await audio.ready;
     await audio.ctx.resume();
-    audio.stream?.getTracks().forEach((t) => t.stop());
     const constraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, latency: { ideal: 0.003 } };
-    if (settings.deviceId) constraints.deviceId = { exact: settings.deviceId };
+    if (target) constraints.deviceId = { exact: target };
+    let missing = false, stream;
     try {
-      audio.stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
     } catch (err) {
-      if (err.name !== 'OverconstrainedError') throw err;
-      delete constraints.deviceId; // saved device unplugged
-      audio.stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+      if (err.name !== 'OverconstrainedError' && err.name !== 'NotFoundError') throw err;
+      delete constraints.deviceId; // the saved device isn't plugged in
+      missing = true;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+    } finally {
+      if (pendingOpen === opening) pendingOpen = null;
     }
-    const switched = await refreshDevices();
-    if (switched) return startAudio();
+    if (gen !== startGen) { stream.getTracks().forEach((t) => t.stop()); return; } // superseded
+    audio.stream?.getTracks().forEach((t) => { t.onended = null; t.stop(); });
+    audio.stream = stream;
+    const devices = await listDevices();
+    if (gen !== startGen) return;
+    // First run: prefer the iRig over the system default
+    const irig = devices.find((d) => /irig/i.test(d.label));
+    if (!settings.deviceId && irig && irig.deviceId !== currentDeviceId()) return switchDevice(irig.deviceId);
+
+    const track = audio.stream.getAudioTracks()[0];
+    track.onended = () => onDeviceLost(track.label);
+    applyDeviceProfile(currentDeviceId());
     connectSource();
+    noise.floor = 0;
+    noise.buckets = [];
     dead.lastSignal = 0;
     dead.warned = false;
     station.updateLatency(audio.stream);
     setTimeout(() => station.updateLatency(audio.stream), 1500); // outputLatency is only known once the context runs
-    const label = audio.stream.getAudioTracks()[0]?.label || 'input';
-    banner(`Listening on <b>${escapeHtml(label)}</b> · ${audio.ctx.sampleRate} Hz` + (/irig/i.test(label) ? '' : ' · <i>no iRig detected; pick it under Input</i>'));
+    const label = track?.label || 'input';
+    banner((missing ? 'The saved input is not connected, so the default input is used. ' : '') +
+      `Listening on <b>${escapeHtml(label)}</b> · ${audio.ctx.sampleRate} Hz`);
     $('start').textContent = 'Restart audio';
     $('start').classList.remove('primary');
   } catch (err) {
-    banner(`Could not open audio input: ${escapeHtml(err.message || err.name)}`, true);
+    if (gen !== startGen) return; // a newer request is in charge
+    const why = err.name === 'NotReadableError' ? 'the device is busy or not working' + (/irig/i.test(opening) ? ' (see the iRig USB note in the README)' : '')
+      : err.name === 'NotAllowedError' ? 'microphone access was denied' : err.message || err.name;
+    if (audio.stream && err.name !== 'NotAllowedError') {
+      // Stay on the input that works, and remember it so the broken one isn't retried at every launch
+      settings.deviceId = currentDeviceId();
+      save();
+      await listDevices();
+      banner(`Could not open <b>${escapeHtml(opening)}</b>: ${escapeHtml(why)}. Still listening on <b>${escapeHtml(audio.stream.getAudioTracks()[0]?.label || 'the previous input')}</b>.`, true);
+    } else if (target && err.name !== 'NotAllowedError') {
+      banner(`Could not open <b>${escapeHtml(opening)}</b>: ${escapeHtml(why)}. Trying the default input…`, true);
+      settings.deviceId = 'default';
+      save();
+      return startAudio();
+    } else {
+      banner(`Could not open audio input: ${escapeHtml(why)}`, true);
+    }
+  } finally {
+    clearTimeout(slow);
   }
 }
 
@@ -84,20 +156,73 @@ function connectSource() {
   }
 }
 
-// Returns true when it picked a different (iRig) device and audio must restart.
-async function refreshDevices() {
+const currentDeviceId = () => audio.stream?.getAudioTracks()[0]?.getSettings().deviceId || settings.deviceId || 'default';
+
+// Fills the Input menu. Labels are only available once microphone access was granted.
+async function listDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return [];
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
   const sel = $('device');
-  sel.replaceChildren(...devices.map((d, i) => new Option(d.label || `Input ${i + 1}`, d.deviceId)));
-  const current = audio.stream?.getAudioTracks()[0]?.getSettings().deviceId;
-  const irig = devices.find((d) => /irig/i.test(d.label));
-  if (!settings.deviceId && irig && irig.deviceId !== current) {
-    settings.deviceId = irig.deviceId;
-    save();
-    return true;
+  const labelled = devices.some((d) => d.label);
+  if (!labelled) {
+    sel.replaceChildren(new Option('(press Start audio to list inputs)', ''));
+  } else {
+    sel.replaceChildren(...devices.map((d, i) => new Option(deviceName(d, i), d.deviceId)));
+    sel.value = audio.stream ? currentDeviceId() : settings.deviceId;
+    if (sel.selectedIndex < 0) sel.selectedIndex = 0;
   }
-  sel.value = current || settings.deviceId;
-  return false;
+  audio.devices = devices;
+  return devices;
+}
+
+function deviceName(d, i) {
+  const label = d.label || `Input ${i + 1}`;
+  if (d.deviceId === 'default' || d.deviceId === 'communications') return label;
+  return /irig|interface|guitar|instrument|hi-?z/i.test(label) ? `🎸 ${label}` : `🎤 ${label}`;
+}
+
+async function switchDevice(id) {
+  saveDeviceProfile();
+  settings.deviceId = id;
+  save();
+  await startAudio();
+}
+
+// Gain and channel are remembered per device: a microphone needs different settings than the iRig
+function saveDeviceProfile() {
+  if (!audio.stream) return;
+  settings.devices[currentDeviceId()] = { gain: settings.gain, channel: settings.channel };
+  save();
+}
+function applyDeviceProfile(id) {
+  const p = settings.devices[id] || { gain: 0, channel: 'mix' };
+  settings.gain = p.gain;
+  settings.channel = p.channel;
+  $('gain').value = p.gain;
+  $('channel').value = p.channel;
+  applyGain();
+}
+
+function onDeviceLost(label) {
+  banner(`<b>${escapeHtml(label || 'The input')}</b> was disconnected. Pick another input under <b>Input</b>, or plug it back in.`, true);
+}
+
+// Hot-plugging: refresh the menu, offer newly connected inputs, recover when ours vanished
+async function onDeviceChange() {
+  const before = new Set((audio.devices || []).map((d) => d.deviceId));
+  const devices = await listDevices();
+  if (!audio.stream) return;
+  const track = audio.stream.getAudioTracks()[0];
+  const ours = currentDeviceId();
+  if (track?.readyState === 'ended' || !devices.some((d) => d.deviceId === ours)) {
+    onDeviceLost(track?.label);
+    return;
+  }
+  const added = devices.find((d) => !before.has(d.deviceId) && d.deviceId !== 'default' && d.deviceId !== 'communications' && d.label);
+  if (added && before.size) {
+    banner(`New input connected: <b>${escapeHtml(added.label)}</b> <button id="useNew" class="small">Use it</button>`);
+    $('useNew').onclick = () => switchDevice(added.deviceId);
+  }
 }
 
 function applyGain() {
@@ -129,11 +254,17 @@ function setupControls() {
   instSel.onchange = () => { settings.instrument = instSel.value; save(); onInstrumentChange(); };
 
   $('start').onclick = startAudio;
-  $('device').onchange = () => { settings.deviceId = $('device').value; save(); startAudio(); };
+  $('device').onchange = () => {
+    if (!$('device').value) return;
+    if (audio.stream) switchDevice($('device').value);
+    else { settings.deviceId = $('device').value; save(); }
+  };
+  navigator.mediaDevices?.addEventListener('devicechange', onDeviceChange);
+  listDevices();
   $('channel').value = settings.channel;
-  $('channel').onchange = () => { settings.channel = $('channel').value; save(); if (audio.stream) connectSource(); };
+  $('channel').onchange = () => { settings.channel = $('channel').value; saveDeviceProfile(); if (audio.stream) connectSource(); };
   $('gain').value = settings.gain;
-  $('gain').oninput = () => { settings.gain = Number($('gain').value); save(); applyGain(); };
+  $('gain').oninput = () => { settings.gain = Number($('gain').value); saveDeviceProfile(); applyGain(); };
   applyGain();
   $('monitor').checked = settings.monitor;
   $('monitor').onchange = () => { settings.monitor = $('monitor').checked; save(); applyMonitor(); };
@@ -217,7 +348,7 @@ const tuner = { lockedString: null, recent: [], cents: 0, shownCents: 0, lastSee
 function detectMono(buf) {
   const bass = isBass(inst());
   const det = bass ? pitch8k : pitch4k;
-  const r = det.detect(buf, { minFreq: bass ? 25 : 60, maxFreq: bass ? 600 : 1500, lowpass: bass ? 500 : 1200, gate: GATE });
+  const r = det.detect(buf, { minFreq: bass ? 25 : 60, maxFreq: bass ? 600 : 1500, lowpass: bass ? 500 : 1200, gate: gate() });
   return r.freq > 0 && r.clarity > 0.8 ? r : null;
 }
 
@@ -367,7 +498,7 @@ function updateAnalyzer(buf, now) {
   const tuning = inst().tuning;
   const minMidi = Math.min(...tuning) - 1;
   const maxMidi = Math.min(96, Math.max(...tuning) + inst().frets);
-  const sounding = rmsOf(buf, 4096) > GATE;
+  const sounding = rmsOf(buf, 4096) > gate();
   if (sounding) an.lastSound = now;
   an.mono = sounding ? detectMono(buf) : null;
 
@@ -376,7 +507,7 @@ function updateAnalyzer(buf, now) {
     // Analyse only what was played after the latest pick attack, once enough of it has arrived;
     // the attack itself is broadband noise and the previous chord would blur the result.
     const sr = audio.ctx.sampleRate;
-    const onset = findOnset(buf, { gate: GATE });
+    const onset = findOnset(buf, { gate: gate() });
     let length = poly.size, fresh = false;
     if (onset >= 0) {
       length = buf.length - onset - Math.round(sr * 0.03);
@@ -384,7 +515,7 @@ function updateAnalyzer(buf, now) {
       if (length < sr * 0.2) return renderAnalyzer(false, now); // still settling
       if (at - an.lastOnset > 4096) { an.lastOnset = at; an.votes.clear(); fresh = true; }
     }
-    const notes = sounding ? poly.analyze(buf, { minMidi, maxMidi, a4: settings.a4, relThreshold: settings.sens, gate: GATE, length }) : [];
+    const notes = sounding ? poly.analyze(buf, { minMidi, maxMidi, a4: settings.a4, relThreshold: settings.sens, gate: gate(), length }) : [];
     const present = new Map(notes.map((n) => [n.midi, n]));
     for (const m of new Set([...an.votes.keys(), ...present.keys()])) {
       const v = an.votes.get(m) || { score: 0 };
@@ -644,6 +775,7 @@ function checkDeadInput(buf, now) {
   for (let i = buf.length - 2048; i < buf.length; i++) {
     if (buf[i] !== 0) { dead.lastSignal = now; if (dead.warned) { dead.warned = false; $('banner').classList.add('hidden'); } return; }
   }
+  if (pendingOpen) { dead.lastSignal = now; return; } // a device switch is in progress
   if (!dead.warned && now - dead.lastSignal > 3000 && audio.ctx.state === 'running') {
     dead.warned = true;
     banner('The input delivers pure digital silence, so the device is not streaming. On Linux, run ' +
@@ -657,6 +789,7 @@ function frame(now) {
   if (audio.analyser && audio.stream) {
     audio.analyser.getFloatTimeDomainData(audio.buf);
     checkDeadInput(audio.buf, now);
+    trackNoiseFloor(audio.buf, now);
     updateMeter(audio.buf, now);
     if (settings.tab === 'tuner') updateTuner(audio.buf, now);
     else if (settings.tab === 'analyzer') updateAnalyzer(audio.buf, now);
@@ -668,6 +801,7 @@ function frame(now) {
 
 setupControls();
 requestAnimationFrame(frame);
+globalThis.irigLab = { audio, settings, noise }; // for debugging from the browser console
 
 // Keep Space for the looper: don't leave clicked controls focused (Space would re-trigger them)
 document.addEventListener('pointerup', () => setTimeout(() => {
