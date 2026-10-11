@@ -1,0 +1,11 @@
+{
+  "name": "irig-lab-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mobile (PWA) fork of iRig Lab: tuner, chord finder and loop station for phones",
+  "scripts": {
+    "start": "python3 serve.py",
+    "test": "node test/dsp.test.js && node test/station.test.js && node test/calibrate.test.js"
+  }
+}

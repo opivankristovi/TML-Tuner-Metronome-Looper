@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- full-bleed background; the rounded version is clipped when rendering -->
+  <rect width="512" height="512" fill="#0f1115"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2029"/><stop offset="1" stop-color="#0f1115"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <!-- tuner arc: -60° … +60° around (256, 330), radius 150 -->
+  <path d="M126 255 A150 150 0 0 1 386 255" fill="none" stroke="#2a313d" stroke-width="26" stroke-linecap="round"/>
+  <path d="M230 182.3 A150 150 0 0 1 282 182.3" fill="none" stroke="#5ad1a6" stroke-width="26" stroke-linecap="round"/>
+  <g stroke="#8b93a3" stroke-width="7" stroke-linecap="round">
+    <line x1="256" y1="140" x2="256" y2="118"/>
+    <line x1="161" y1="165" x2="149" y2="146"/>
+    <line x1="351" y1="165" x2="363" y2="146"/>
+  </g>
+  <!-- needle -->
+  <line x1="256" y1="330" x2="272" y2="172" stroke="#5ad1a6" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="256" cy="330" r="22" fill="#5ad1a6"/>
+  <!-- waveform -->
+  <path d="M96 400 C128 400 136 372 160 372 S192 428 216 428 S248 368 272 368 S304 432 328 432 S360 384 384 384 S408 400 416 400"
+        fill="none" stroke="#6aa8ff" stroke-width="14" stroke-linecap="round"/>
+</svg>

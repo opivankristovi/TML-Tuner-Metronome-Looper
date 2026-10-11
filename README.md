@@ -4,6 +4,9 @@ Tuner, note/chord analyzer and 3-track loop station for guitar or bass through a
 (or any audio input). It runs in the browser with the Web Audio API and needs no build step
 or dependencies.
 
+**Phone version:** [`mobile/`](mobile/README.md) is a touchscreen fork that installs as an app on
+iPhone and Android and works with built-in, headset, USB (OTG) and Bluetooth microphones.
+
 ## Screenshots
 
 **Tuner**: an E string, 0.9 cents sharp, counted as in tune.

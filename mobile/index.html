@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>iRig Lab Mobile</title>
+  <meta name="description" content="Guitar & bass tuner, chord finder and 3-track loop station for your phone">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="iRig Lab">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">iRig <b>Lab</b></div>
+    <button id="inputChip" class="input-chip" aria-label="Input settings">
+      <span id="inputIcon">🎙️</span>
+      <span id="inputName">No input</span>
+      <span class="meter"><span id="meterFill"></span></span>
+      <span id="clip" class="clip">CLIP</span>
+    </button>
+  </header>
+
+  <div id="banner" class="banner hidden"></div>
+
+  <main>
+    <!-- ------------------------------------------------------------ TUNER -->
+    <section id="tab-tuner" class="tab">
+      <div class="row center">
+        <select id="instrument" class="pill-select" aria-label="Instrument"></select>
+      </div>
+      <div class="tuner-note"><span id="tNote" class="big-note">–</span><span id="tOct" class="octave"></span></div>
+      <canvas id="gauge" class="gauge"></canvas>
+      <div class="readouts">
+        <div><span id="tCents">–</span><small>cents</small></div>
+        <div><span id="tFreq">–</span><small>Hz</small></div>
+        <div><span id="tTarget">–</span><small>target</small></div>
+      </div>
+      <div id="tHint" class="hint">&nbsp;</div>
+      <div class="strings">
+        <button id="stringAuto" class="string active">Auto</button>
+        <div id="stringBtns"></div>
+      </div>
+      <canvas id="history" class="drift"></canvas>
+    </section>
+
+    <!-- ----------------------------------------------------------- CHORDS -->
+    <section id="tab-chords" class="tab">
+      <div class="row">
+        <div class="seg" id="anMode">
+          <button data-mode="auto">Auto</button>
+          <button data-mode="note">Note</button>
+          <button data-mode="chord">Chord</button>
+        </div>
+        <label class="toggle"><input id="hold" type="checkbox"><span>Hold</span></label>
+      </div>
+      <div class="card result">
+        <div id="anName" class="big-chord">–</div>
+        <div id="anLong" class="an-long">Play a note or strum a chord</div>
+        <div id="anNotes" class="chips"></div>
+        <div id="anAlt" class="alts"></div>
+      </div>
+      <div class="card">
+        <div class="board-head">
+          <span id="anBoardTitle">Fretboard</span>
+          <span class="voicing">
+            <button id="vPrev" class="icon-btn" aria-label="Previous voicing">‹</button>
+            <span id="vLabel"></span>
+            <button id="vNext" class="icon-btn" aria-label="Next voicing">›</button>
+          </span>
+        </div>
+        <svg id="fretboard" class="fretboard"></svg>
+        <div id="anPositions" class="positions"></div>
+      </div>
+      <canvas id="spectrum" class="spectrum"></canvas>
+      <div class="history-strip">
+        <div id="anHistory"></div>
+        <button id="anHistClear" class="small">Clear</button>
+      </div>
+      <details class="more">
+        <summary>Detection</summary>
+        <label class="field">Sensitivity <input id="sens" type="range" min="0.1" max="0.4" step="0.01"></label>
+        <p class="note">Higher is stricter: fewer false notes, but quiet strings may be missed.</p>
+      </details>
+    </section>
+
+    <!-- ------------------------------------------------------------ LOOPS -->
+    <section id="tab-loops" class="tab">
+      <div class="card transport">
+        <div class="row">
+          <button id="playAll" class="playall">▶ Play all</button>
+          <div id="beatLights" class="beats"></div>
+          <div id="barPos" class="barpos">Stopped</div>
+        </div>
+        <div class="row">
+          <div class="stepper">
+            <button id="bpmDown" aria-label="Slower">−</button>
+            <input id="bpm" type="number" inputmode="numeric" min="30" max="300" aria-label="Tempo in BPM">
+            <button id="bpmUp" aria-label="Faster">+</button>
+            <span class="unit">BPM</span>
+          </div>
+          <button id="tap" class="small">Tap</button>
+          <button id="metroBtn" class="small metro" aria-pressed="false">Click</button>
+        </div>
+        <div id="tempoLock" class="lockmsg"></div>
+      </div>
+      <details class="more" id="loopSettings">
+        <summary>Rhythm & loop settings</summary>
+        <label class="field">Rhythm <select id="rhythm"></select></label>
+        <label class="field">Click volume <input id="metroVol" type="range" min="0" max="1.5" step="0.01"></label>
+        <label class="field">Start on
+          <select id="quantize">
+            <option value="bar">next bar</option>
+            <option value="beat">next beat</option>
+            <option value="off">immediately</option>
+          </select>
+        </label>
+        <label class="field">Rec length
+          <select id="recBars">
+            <option value="0">free</option>
+            <option value="1">1 bar</option>
+            <option value="2">2 bars</option>
+            <option value="4">4 bars</option>
+            <option value="8">8 bars</option>
+            <option value="16">16 bars</option>
+          </select>
+        </label>
+        <label class="toggle field"><input id="countIn" type="checkbox"><span>1-bar count-in</span></label>
+        <label class="field">Loops volume <input id="lVol" type="range" min="0" max="1.5" step="0.01"></label>
+      </details>
+      <div id="echoHint" class="note warn hidden">
+        <span>🎧 With the built-in mic, the phone speaker leaks into overdubs. Use headphones, or turn on
+        <a href="#" data-goto="settings">Echo cancellation</a>.</span>
+        <button id="echoHintClose" aria-label="Dismiss">✕</button>
+      </div>
+      <div id="tracks" class="tracks"></div>
+    </section>
+
+    <!-- --------------------------------------------------------- SETTINGS -->
+    <section id="tab-settings" class="tab">
+      <h2>Input</h2>
+      <div id="deviceList" class="device-list"></div>
+      <p class="note">
+        Plug in a USB microphone or interface (USB-C / OTG adapter, or Lightning on older iPhones),
+        connect a wired headset, or pair a Bluetooth headset: it shows up here.
+        <span id="iosNote" class="hidden">On iPhone, the last connected microphone is used automatically.</span>
+      </p>
+      <div class="card">
+        <label class="field">Gain <input id="gain" type="range" min="0" max="30" step="0.5"><output id="gainOut"></output></label>
+        <label class="field">Channel
+          <select id="channel"><option value="mix">Mix</option><option value="0">Left</option><option value="1">Right</option></select>
+        </label>
+        <label class="toggle field"><input id="aec" type="checkbox"><span>Echo cancellation</span></label>
+        <p class="note">For looping through the phone speaker with the built-in mic. It removes the playback from the mic, but can colour the sound. Not needed with headphones.</p>
+        <label class="toggle field"><input id="monitor" type="checkbox"><span>Hear the input</span></label>
+        <label class="field">Monitor volume <input id="monitorVol" type="range" min="0" max="1" step="0.01"></label>
+        <p class="note">Only with headphones: through the speaker it feeds back.</p>
+      </div>
+
+      <h2>Instrument</h2>
+      <div class="card">
+        <label class="field">Tuning <select id="instrument2"></select></label>
+        <label class="field">A4 reference <input id="a4" type="number" inputmode="decimal" min="415" max="466" step="0.5"> Hz</label>
+      </div>
+
+      <h2>Loop timing</h2>
+      <div class="card">
+        <div class="latency-row"><span>Latency</span><b id="latValue">–</b></div>
+        <div id="latSource" class="note"></div>
+        <button id="calibrate" class="wide">Measure latency</button>
+        <p id="calibNote" class="note">
+          Takes 4 seconds. Uses the phone speaker and the current microphone: turn the volume up, and
+          unplug headphones (the clicks must reach the mic). With Bluetooth or headphones, set it by ear instead.
+        </p>
+        <label class="field">Fine-tune <input id="lLat" type="range" min="-100" max="300" step="1"><output id="lLatOut"></output></label>
+      </div>
+
+      <h2>App</h2>
+      <div class="card">
+        <label class="toggle field"><input id="wake" type="checkbox"><span>Keep the screen on while playing</span></label>
+        <button id="install" class="wide hidden">Install on home screen</button>
+        <p class="note" id="installNote"></p>
+      </div>
+      <p class="note about">iRig Lab Mobile · <a href="https://github.com/opivankristovi/MS-R1-iRig-Lab" target="_blank" rel="noopener">source</a></p>
+    </section>
+  </main>
+
+  <nav class="tabbar" role="tablist">
+    <button data-tab="tuner" role="tab"><svg viewBox="0 0 24 24"><path d="M4 16a8 8 0 0 1 16 0" /><path d="M12 16l4-6" /></svg>Tuner</button>
+    <button data-tab="chords" role="tab"><svg viewBox="0 0 24 24"><path d="M6 3v18M10 3v18M14 3v18M18 3v18M4 8h16M4 13h16" /><circle cx="10" cy="10.5" r="1.6" /><circle cx="14" cy="15.5" r="1.6" /></svg>Chords</button>
+    <button data-tab="loops" role="tab"><svg viewBox="0 0 24 24"><path d="M17 4l3 3-3 3" /><path d="M20 7H8a4 4 0 0 0-4 4v1" /><path d="M7 20l-3-3 3-3" /><path d="M4 17h12a4 4 0 0 0 4-4v-1" /></svg>Loops</button>
+    <button data-tab="settings" role="tab"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>Settings</button>
+  </nav>
+
+  <div id="startOverlay" class="overlay">
+    <img src="icons/icon-192.png" alt="" class="logo">
+    <h1>iRig <b>Lab</b></h1>
+    <p>Tuner · chord finder · loop station</p>
+    <button id="start" class="start">Tap to start</button>
+    <p class="note">The app needs the microphone. Plug in or pair your mic first if you use an external one.</p>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
