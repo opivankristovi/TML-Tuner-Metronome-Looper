@@ -13,7 +13,7 @@ else
   echo "Note: iRig HD not found — plug it in (you can still pick another input in the app)."
 fi
 
-python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$DIR" >/dev/null 2>&1 &
+python3 "$DIR/serve.py" "$PORT" >/dev/null 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 0.5

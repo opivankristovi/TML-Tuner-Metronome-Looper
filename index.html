@@ -45,7 +45,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="tuner" class="active">Tuner <kbd>1</kbd></button>
     <button role="tab" data-tab="analyzer">Note &amp; Chord <kbd>2</kbd></button>
-    <button role="tab" data-tab="looper">Looper <kbd>3</kbd></button>
+    <button role="tab" data-tab="looper">Loop Station <kbd>3</kbd></button>
   </nav>
 
   <div id="banner" class="banner">Plug your instrument into the iRig HD, then press <b>Start audio</b>.</div>
@@ -114,31 +114,57 @@
       </div>
     </section>
 
-    <!-- ----------------------------------------------------------- LOOPER -->
+    <!-- ----------------------------------------------------- LOOP STATION -->
     <section id="tab-looper" class="tab">
-      <div class="looper">
-        <div class="loop-top">
-          <div id="lState" class="lstate empty">EMPTY</div>
-          <div id="lTime" class="ltime">0.0 s</div>
+      <div class="station">
+        <div class="transport">
+          <div class="tgroup">
+            <label>Tempo <input id="bpm" type="number" min="30" max="300" step="1"> BPM</label>
+            <button id="tap" class="small">Tap<kbd>T</kbd></button>
+          </div>
+          <label>Rhythm <select id="rhythm"></select></label>
+          <div class="tgroup">
+            <label class="check"><input id="metro" type="checkbox"> Metronome<kbd>M</kbd></label>
+            <input id="metroVol" type="range" min="0" max="1.5" step="0.01" title="Metronome volume">
+          </div>
+          <label class="check"><input id="countIn" type="checkbox"> 1-bar count-in</label>
+          <label>Start on
+            <select id="quantize">
+              <option value="bar">next bar</option>
+              <option value="beat">next beat</option>
+              <option value="off">immediately</option>
+            </select>
+          </label>
+          <label>Rec length
+            <select id="recBars">
+              <option value="0">free</option>
+              <option value="1">1 bar</option>
+              <option value="2">2 bars</option>
+              <option value="4">4 bars</option>
+              <option value="8">8 bars</option>
+              <option value="16">16 bars</option>
+            </select>
+          </label>
         </div>
-        <canvas id="loopWave" width="1200" height="180"></canvas>
-        <div class="loop-buttons">
-          <button id="lMain" class="lmain rec">● Record<kbd>Space</kbd></button>
-          <button id="lStop">■ Stop<kbd>S</kbd></button>
-          <button id="lUndo">↶ Undo<kbd>Z</kbd></button>
-          <button id="lRedo">↷ Redo<kbd>⇧Z</kbd></button>
-          <button id="lClear" class="danger">✕ Clear<kbd>Del</kbd></button>
-          <button id="lExport">⤓ Export WAV</button>
+
+        <div class="transport bar2">
+          <button id="playAll" class="playall">▶ Play all<kbd>Space</kbd></button>
+          <div id="beatLights" class="beats"></div>
+          <div id="barPos" class="barpos">Stopped</div>
+          <span id="tempoLock" class="lockmsg"></span>
+          <span class="spacer"></span>
+          <label>Loops <input id="lVol" type="range" min="0" max="1.5" step="0.01"></label>
+          <label>Latency offset <input id="lLat" type="range" min="-50" max="150" step="1"><output id="lLatOut"></output></label>
         </div>
-        <div class="loop-settings">
-          <label>Loop volume <input id="lVol" type="range" min="0" max="1.5" step="0.01" value="1"></label>
-          <label>Latency offset <input id="lLat" type="range" min="-50" max="150" step="1" value="0"><output id="lLatOut"></output></label>
-        </div>
-        <div id="layers" class="layers"></div>
+
+        <div id="tracks" class="tracks"></div>
+
         <p class="help">
-          <b>Space</b> cycles Record → Play → Overdub → Play. The first recording sets the loop length.
-          Overdubs are shifted by the measured audio latency so they line up with what you heard;
-          if they sound late or early, nudge <i>Latency offset</i>.
+          Each track: <b>Q</b>/<b>W</b>/<b>E</b> cycles Rec → Play → Overdub → Play, <b>A</b>/<b>S</b>/<b>D</b> stops it.
+          <b>Space</b> starts/stops everything, <b>Z</b> / <b>Shift+Z</b> undo/redo and <b>Del</b> clears the selected track,
+          <b>M</b> toggles the metronome, <b>T</b> taps the tempo.
+          Actions wait for the next bar (or beat), so every loop is whole bars and the tracks stay in sync; pressing up to
+          ~60&nbsp;ms after the downbeat still counts as on time. Press again before the bar to cancel. Loops can be up to 90&nbsp;seconds.
         </p>
       </div>
     </section>

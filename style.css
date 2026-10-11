@@ -133,24 +133,44 @@ canvas { width: 100%; display: block; }
 #anHistory { display: flex; gap: 6px; flex: 1; overflow-x: auto; }
 #anHistory span { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; color: var(--text); white-space: nowrap; }
 
-/* Looper */
-.looper { max-width: 1200px; margin: 0 auto; }
-.loop-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-.lstate { font-size: 28px; font-weight: 700; letter-spacing: 2px; }
-.lstate.recording, .lstate.overdubbing { color: var(--bad); }
-.lstate.playing { color: var(--accent); }
-.lstate.stopped, .lstate.empty { color: var(--muted); }
-.ltime { font-size: 28px; font-variant-numeric: tabular-nums; color: var(--muted); }
-#loopWave { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
-.loop-buttons { display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; }
-.loop-buttons button { padding: 14px 20px; font-size: 16px; }
-.lmain { min-width: 260px; font-weight: 700; }
-.lmain.rec { background: #4a1f22; border-color: #7b2f34; }
-.lmain.dub { background: #4a3a1a; border-color: #7b6230; }
-.lmain.play { background: #173d30; border-color: #2b6b54; }
-.loop-settings { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 14px; }
-.layers { display: flex; flex-direction: column; gap: 6px; }
-.layer { display: grid; grid-template-columns: 90px 1fr 200px auto auto auto; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
-.layer canvas { height: 34px; }
-.layer.muted { opacity: .45; }
-.help { color: var(--muted); font-size: 13px; margin-top: 18px; line-height: 1.6; }
+/* Loop station */
+.station { max-width: 1400px; margin: 0 auto; }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; }
+.transport .tgroup { display: flex; align-items: center; gap: 8px; }
+.transport kbd { margin-left: 6px; }
+.transport .spacer { flex: 1; }
+.playall { font-weight: 700; min-width: 150px; }
+.beats { display: flex; gap: 6px; }
+.beats span { width: 16px; height: 16px; border-radius: 50%; background: #262b36; border: 1px solid var(--line); transition: background .05s; }
+.beats span.on { background: var(--accent); }
+.beats span.on.accent { background: var(--warn); }
+.barpos { font-variant-numeric: tabular-nums; min-width: 110px; color: var(--muted); }
+.barpos.counting { color: var(--warn); font-weight: 700; }
+.lockmsg { color: var(--muted); font-size: 12px; font-style: italic; }
+.tracks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+@media (max-width: 1000px) { .tracks { grid-template-columns: 1fr; } }
+.track { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; border-top: 4px solid #3b4253; }
+.track.selected { border-color: #46506a; box-shadow: 0 0 0 1px #46506a; }
+.track[data-state=recording] { border-top-color: var(--bad); }
+.track[data-state=dubbing] { border-top-color: #f2a14e; }
+.track[data-state=playing] { border-top-color: var(--accent); }
+.track-head { display: flex; justify-content: space-between; align-items: center; }
+.tname { font-weight: 700; font-size: 17px; }
+.tstate { font-size: 12px; font-weight: 700; letter-spacing: 1px; padding: 2px 8px; border-radius: 4px; background: #262b36; color: var(--muted); }
+.tstate.recording { background: var(--bad); color: #1a0606; }
+.tstate.dubbing { background: #f2a14e; color: #1f1204; }
+.tstate.playing { background: var(--accent); color: #062418; }
+.twave { height: 110px; background: #12151b; border-radius: 8px; border: 1px solid var(--line); }
+.tinfo { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; min-height: 18px; }
+.tpending { color: var(--warn); font-size: 13px; font-weight: 600; min-height: 18px; }
+.tmain { padding: 16px; font-size: 18px; font-weight: 700; }
+.tmain.rec { background: #4a1f22; border-color: #7b2f34; }
+.tmain.dub { background: #4a3a1a; border-color: #7b6230; }
+.tmain.play { background: #173d30; border-color: #2b6b54; }
+.tmain.pending { animation: blink .5s steps(2, start) infinite; }
+@keyframes blink { to { filter: brightness(1.6); } }
+.trow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 6px; }
+.trow button { padding: 8px 6px; }
+.tvol { justify-content: space-between; }
+.tvol input { flex: 1; }
+.help { color: var(--muted); font-size: 13px; margin-top: 16px; line-height: 1.6; }

@@ -1,6 +1,6 @@
 # iRig Lab
 
-Tuner, note/chord analyzer and looper for guitar or bass through an **IK Multimedia iRig HD**
+Tuner, note/chord analyzer and 3-track loop station for guitar or bass through an **IK Multimedia iRig HD**
 (or any audio input). It runs in the browser with the Web Audio API and needs no build step
 or dependencies.
 
@@ -15,9 +15,9 @@ Dashed dots are octave doublings inferred from the shape.
 
 ![Chord analyzer](docs/screenshots/chord-analyzer.png)
 
-**Looper**: overdubbing a second layer over a 3-second loop.
+**Loop Station**: track 1 overdubbing, track 2 playing and track 3 recording, over a rock beat at 120 BPM.
 
-![Looper](docs/screenshots/looper.png)
+![Loop station](docs/screenshots/loop-station.png)
 
 The screenshots were captured from synthesized guitar signals.
 
@@ -29,9 +29,11 @@ The screenshots were captured from synthesized guitar signals.
 
 The script switches the iRig HD's PipeWire profile to `pro-audio` (by default PipeWire leaves
 it `off`, so it has no input). It then serves the folder on `http://localhost:8765` and opens
-a Chromium app window. You can also serve the folder yourself with
-`python3 -m http.server 8765` and open it in any Chromium or Firefox browser. It must be
-`localhost`, because microphone access needs a secure origin.
+a Chromium app window. You can also run `python3 serve.py` and open `http://localhost:8765`
+in any Chromium or Firefox browser. It must be `localhost`, because microphone access needs a
+secure origin. `serve.py` also sends the cross-origin isolation headers that let the loop
+station share its buffers between the audio thread and the UI; a plain static server works,
+but waveforms and export then fall back to copying.
 
 The first time, press **Start audio** and allow microphone access. The app picks the iRig
 automatically when it's listed.
@@ -54,12 +56,31 @@ automatically when it's listed.
 - **Hold** keeps the last result on screen. **Sensitivity** sets how weak a note can be and
   still count (higher means stricter, with fewer false notes).
 
-**Looper** (key `3`)
-- `Space` cycles: Record → Play (closes the loop) → Overdub → Play …
-- `S` stop · `Z` undo · `Shift+Z` redo · `Del` clear.
-- Unlimited overdub layers, each with its own volume, mute, delete and WAV export. **Export WAV** saves the full mix.
-- Overdubs are shifted by the measured round-trip latency so they line up with what you heard.
-  If overdubs land late or early, nudge **Latency offset**.
+**Loop Station** (key `3`)
+- **Three tracks**, each with its own Rec / Play / Overdub / Stop, undo/redo, clear, volume and WAV export.
+- **Synced to a bar grid.** Every action waits for the next bar (or the next beat, or
+  happens immediately; see *Start on*), so loops are whole bars and the tracks stay in sync.
+  A stopped track restarts in phase with the others. A press up to ~60 ms after the downbeat
+  still counts as on time, and pressing again before the bar cancels the queued action.
+- **Loops up to 90 seconds.** A take stops itself at the last whole bar under 90 s. *Rec length*
+  can also fix it at 1, 2, 4, 8 or 16 bars, so it closes itself.
+- **Metronome and rhythms**: clicks in 4/4, 3/4, 2/4, 5/4, 6/8 and 7/8, plus 12 drum grooves
+  (rock, pop, half-time, four-on-the-floor, funk, hip-hop, shuffle, waltz, 6/8, reggae
+  one-drop, bossa nova, metal). Tap tempo and an optional 1-bar count-in are included. The
+  rhythm sets the time signature. Tempo and meter lock while tracks hold loops.
+- **Overdubs** line up with what you heard: recording is shifted by the measured round-trip
+  latency. If overdubs land late or early, nudge **Latency offset**. The last 6 overdubs per
+  track can be undone; older ones are merged into the loop.
+
+| Key | Action |
+|---|---|
+| `Q` `W` `E` | Track 1/2/3: Rec → Play → Overdub → Play … |
+| `A` `S` `D` | Stop track 1/2/3 |
+| `Space` | Play all / stop all |
+| `Z`, `Shift+Z` | Undo / redo on the selected track |
+| `Del` | Clear the selected track |
+| `M` | Metronome on/off |
+| `T` | Tap tempo |
 
 **Input bar**: device, channel (Mix/Left/Right), software gain, a level meter with a clip
 light, and **Monitor** to hear the input through the computer (this adds latency; most
@@ -70,11 +91,16 @@ players monitor through an amp or the iRig's headphone out instead).
 | File | What it does |
 |---|---|
 | `js/dsp.js` | FFT, MPM pitch detector, polyphonic detector (iterative harmonic salience with spectral-smoothness subtraction), onset detection, chord naming, fingering search |
-| `js/looper-worklet.js` | Sample-accurate looper running on the audio thread |
+| `js/station-worklet.js` | Loop-station engine on the audio thread: transport, bar-quantized track actions, latency-compensated recording, drum synth |
+| `js/station.js` | Loop-station UI, buffer allocation, waveforms, export, keys |
+| `js/rhythms.js` | Metronome and drum patterns |
 | `js/app.js` | Audio graph, UI, analysis loop |
 | `js/fretboard.js` | SVG fretboard |
 | `js/instruments.js` | Tunings |
-| `test/dsp.test.js` | Synthesised plucked-string tests: `npm test` |
+| `test/dsp.test.js` | Synthesised plucked-string tests for pitch, chords and fingerings |
+| `test/station.test.js` | Loop-station engine tests: quantization, latency alignment, overdub/undo, sync, 90 s limit |
+
+Run all tests with `npm test`.
 
 How the chord analysis works:
 1. After each pick attack it analyses only the audio from 30 ms after the attack, so the

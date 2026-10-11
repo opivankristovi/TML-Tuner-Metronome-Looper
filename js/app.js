@@ -1,23 +1,28 @@
 import { PitchDetector, PolyDetector, nameChord, findFingerings, findOnset, positionsFor, freqToMidi, midiToFreq, noteName, NOTE_NAMES, pc, rmsOf } from './dsp.js';
 import { INSTRUMENTS, isBass } from './instruments.js';
 import { renderFretboard } from './fretboard.js';
-import { encodeWav } from './wav.js';
+import { createStation } from './station.js';
 
 const $ = (id) => document.getElementById(id);
 const GATE = 0.0025; // RMS below this is treated as silence
 
 // ------------------------------------------------------------- settings
 const settings = Object.assign(
-  { deviceId: '', channel: 'mix', gain: 0, monitor: false, monitorVol: 0.8, instrument: 'gtr-std', a4: 440, tab: 'tuner', anMode: 'auto', sens: 0.22, loopVol: 1, latOffset: 0 },
+  {
+    deviceId: '', channel: 'mix', gain: 0, monitor: false, monitorVol: 0.8, instrument: 'gtr-std', a4: 440, tab: 'tuner', anMode: 'auto', sens: 0.22,
+    loopVol: 1, latOffset: 0, bpm: 100, rhythm: 'click-4', metronome: false, metroVol: 0.7, countIn: true, quantize: 'bar', recBars: 0, trackGains: [1, 1, 1],
+  },
   load()
 );
 function load() { try { return JSON.parse(localStorage.getItem('irig-lab') || '{}'); } catch { return {}; } }
 function save() { try { localStorage.setItem('irig-lab', JSON.stringify(settings)); } catch { /* storage unavailable */ } }
 
+const station = createStation({ settings, save, banner });
+
 const inst = () => INSTRUMENTS.find((i) => i.id === settings.instrument) || INSTRUMENTS[0];
 
 // ---------------------------------------------------------------- audio
-const audio = { ctx: null, stream: null, source: null, splitter: null, input: null, analyser: null, monitor: null, looper: null, loopGain: null, buf: null };
+const audio = { ctx: null, stream: null, source: null, splitter: null, input: null, analyser: null, monitor: null, buf: null };
 let pitch4k, pitch8k, poly;
 
 async function buildGraph() {
@@ -28,12 +33,7 @@ async function buildGraph() {
   audio.input.connect(audio.analyser);
   audio.monitor = new GainNode(ctx, { gain: 0 });
   audio.input.connect(audio.monitor).connect(ctx.destination);
-  await ctx.audioWorklet.addModule('js/looper-worklet.js');
-  audio.looper = new AudioWorkletNode(ctx, 'looper', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 1, channelCountMode: 'explicit' });
-  audio.loopGain = new GainNode(ctx, { gain: settings.loopVol });
-  audio.input.connect(audio.looper);
-  audio.looper.connect(audio.loopGain).connect(ctx.destination);
-  audio.looper.port.onmessage = (e) => onLooperMessage(e.data);
+  await station.attach(ctx, audio.input);
   audio.buf = new Float32Array(audio.analyser.fftSize);
   pitch4k = new PitchDetector(4096, ctx.sampleRate);
   pitch8k = new PitchDetector(8192, ctx.sampleRate);
@@ -60,8 +60,8 @@ async function startAudio() {
     connectSource();
     dead.lastSignal = 0;
     dead.warned = false;
-    updateLatency();
-    setTimeout(updateLatency, 1500); // outputLatency is only known once the context runs
+    station.updateLatency(audio.stream);
+    setTimeout(() => station.updateLatency(audio.stream), 1500); // outputLatency is only known once the context runs
     const label = audio.stream.getAudioTracks()[0]?.label || 'input';
     banner(`Listening on <b>${escapeHtml(label)}</b> · ${audio.ctx.sampleRate} Hz` + (/irig/i.test(label) ? '' : ' · <i>no iRig detected; pick it under Input</i>'));
     $('start').textContent = 'Restart audio';
@@ -159,7 +159,7 @@ function setupControls() {
   $('vNext').onclick = () => cycleVoicing(1);
   $('anHistClear').onclick = () => { an.history = []; renderHistory(); };
 
-  setupLooperControls();
+  station.setup();
   document.addEventListener('keydown', onKey);
   onInstrumentChange();
 }
@@ -628,204 +628,11 @@ function drawSpectrum(notes) {
   }
 }
 
-// ---------------------------------------------------------------- looper
-const loop = { state: 'empty', loopLen: 0, pos: 0, recLen: 0, layers: [], data: new Map(), canRedo: false, mix: null, autoLatency: 0 };
-
-function looperCmd(cmd, extra = {}) {
-  if (!audio.looper) { banner('Start audio first to use the looper.', true); return; }
-  audio.looper.port.postMessage({ cmd, ...extra });
-}
-
-function mainButton() {
-  switch (loop.state) {
-    case 'empty': return looperCmd('rec');
-    case 'recording': return looperCmd('play');
-    case 'playing': return looperCmd('dub');
-    case 'overdubbing': return looperCmd('play');
-    case 'stopped': return looperCmd('play');
-  }
-}
-
-function setupLooperControls() {
-  $('lMain').onclick = mainButton;
-  $('lStop').onclick = () => looperCmd('stop');
-  $('lUndo').onclick = () => looperCmd('undo');
-  $('lRedo').onclick = () => looperCmd('redo');
-  $('lClear').onclick = clearLoop;
-  $('lExport').onclick = () => exportWav(mixdown(), 'loop');
-  $('lVol').value = settings.loopVol;
-  $('lVol').oninput = () => {
-    settings.loopVol = Number($('lVol').value);
-    save();
-    if (audio.loopGain) audio.loopGain.gain.setTargetAtTime(settings.loopVol, audio.ctx.currentTime, 0.02);
-  };
-  $('lLat').value = settings.latOffset;
-  $('lLat').oninput = () => { settings.latOffset = Number($('lLat').value); save(); updateLatency(); };
-  renderLooper();
-}
-
-function clearLoop() {
-  if (loop.layers.length && !confirm('Clear the loop and all layers?')) return;
-  looperCmd('clear');
-}
-
-function updateLatency() {
-  const ctx = audio.ctx;
-  let auto = 0;
-  if (ctx) {
-    const inLat = audio.stream?.getAudioTracks()[0]?.getSettings().latency || 0;
-    auto = (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + inLat;
-  }
-  loop.autoLatency = auto;
-  const total = Math.max(0, auto * 1000 + settings.latOffset);
-  $('lLatOut').textContent = ctx ? `${total.toFixed(0)} ms (auto ${(auto * 1000).toFixed(0)} ${settings.latOffset >= 0 ? '+' : '−'} ${Math.abs(settings.latOffset)})` : `${settings.latOffset} ms`;
-  if (audio.looper) audio.looper.port.postMessage({ cmd: 'latency', samples: (total / 1000) * ctx.sampleRate });
-}
-
-function onLooperMessage(msg) {
-  if (msg.type === 'pos') { loop.pos = msg.pos; loop.recLen = msg.recLen; return; }
-  if (msg.type === 'layer') { loop.data.set(msg.id, msg.data); return; }
-  if (msg.type === 'state') {
-    Object.assign(loop, { state: msg.state, loopLen: msg.loopLen, layers: msg.layers, canRedo: msg.canRedo });
-    loop.mix = null;
-    renderLooper();
-  }
-}
-
-function mixdown() {
-  const out = new Float32Array(loop.loopLen);
-  for (const l of loop.layers) {
-    const d = loop.data.get(l.id);
-    if (!d || l.muted) continue;
-    for (let i = 0; i < out.length; i++) out[i] += d[i] * l.gain;
-  }
-  return out;
-}
-
-function exportWav(samples, name) {
-  if (!samples.length) return;
-  let peak = 0;
-  for (const s of samples) peak = Math.max(peak, Math.abs(s));
-  const norm = peak > 0.99 ? 0.99 / peak : 1; // avoid clipping when layers stack up
-  const scaled = norm === 1 ? samples : samples.map((s) => s * norm);
-  const url = URL.createObjectURL(encodeWav(scaled, audio.ctx.sampleRate));
-  const a = Object.assign(document.createElement('a'), { href: url, download: `${name}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.wav` });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
-
-const STATE_LABEL = { empty: 'EMPTY', recording: '● RECORDING', playing: '▶ PLAYING', overdubbing: '● OVERDUBBING', stopped: '■ STOPPED' };
-const MAIN_LABEL = {
-  empty: ['● Record', 'rec'],
-  recording: ['▶ Close loop & play', 'play'],
-  playing: ['● Overdub', 'dub'],
-  overdubbing: ['▶ End overdub', 'play'],
-  stopped: ['▶ Play', 'play'],
-};
-
-function renderLooper() {
-  const s = loop.state;
-  $('lState').textContent = STATE_LABEL[s];
-  $('lState').className = `lstate ${s}`;
-  const [label, cls] = MAIN_LABEL[s];
-  $('lMain').innerHTML = `${label}<kbd>Space</kbd>`;
-  $('lMain').className = `lmain ${cls}`;
-  $('lStop').disabled = !(s === 'recording' || s === 'playing' || s === 'overdubbing');
-  $('lUndo').disabled = !(loop.layers.length || s === 'recording' || s === 'overdubbing');
-  $('lRedo').disabled = !loop.canRedo;
-  $('lClear').disabled = s === 'empty' && !loop.canRedo;
-  $('lExport').disabled = !loop.layers.length;
-
-  const list = $('layers');
-  list.replaceChildren();
-  loop.layers.forEach((l, i) => {
-    const row = document.createElement('div');
-    row.className = 'layer' + (l.muted ? ' muted' : '');
-    const name = document.createElement('span');
-    name.textContent = i === 0 ? 'Base loop' : `Overdub ${i}`;
-    const cv = document.createElement('canvas');
-    cv.width = 600; cv.height = 34;
-    const d = loop.data.get(l.id);
-    if (d) drawWave(cv, d, '#6aa8ff');
-    const vol = Object.assign(document.createElement('input'), { type: 'range', min: 0, max: 1.5, step: 0.01, value: l.gain, title: 'Layer volume' });
-    vol.oninput = () => looperCmd('layer', { id: l.id, gain: Number(vol.value) });
-    const mute = Object.assign(document.createElement('button'), { textContent: l.muted ? 'Unmute' : 'Mute', className: 'small' });
-    mute.onclick = () => looperCmd('layer', { id: l.id, muted: !l.muted });
-    const dl = Object.assign(document.createElement('button'), { textContent: '⤓', className: 'small', title: 'Export this layer' });
-    dl.onclick = () => d && exportWav(d, `layer${i}`);
-    const del = Object.assign(document.createElement('button'), { textContent: '✕', className: 'small', title: 'Delete layer' });
-    del.onclick = () => looperCmd('layer', { id: l.id, remove: true });
-    row.append(name, cv, vol, mute, dl, del);
-    list.appendChild(row);
-  });
-}
-
-function drawWave(canvas, data, color) {
-  const g = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  g.clearRect(0, 0, W, H);
-  g.fillStyle = color;
-  const step = data.length / W;
-  let peak = 1e-6;
-  for (let i = 0; i < data.length; i += 64) peak = Math.max(peak, Math.abs(data[i]));
-  const scale = Math.min(1 / peak, 8) * 0.95;
-  for (let x = 0; x < W; x++) {
-    let mn = 0, mx = 0;
-    const a = Math.floor(x * step), b = Math.min(data.length, Math.floor((x + 1) * step));
-    for (let i = a; i < b; i += 4) { if (data[i] < mn) mn = data[i]; if (data[i] > mx) mx = data[i]; }
-    g.fillRect(x, H / 2 - mx * scale * (H / 2), 1, Math.max(1, (mx - mn) * scale * (H / 2)));
-  }
-}
-
-function drawLooper() {
-  const c = $('loopWave'), g = c.getContext('2d');
-  const W = c.width, H = c.height;
-  const sr = audio.ctx?.sampleRate || 48000;
-  if (loop.state === 'recording') {
-    g.clearRect(0, 0, W, H);
-    g.fillStyle = '#ef5b5b';
-    const secs = loop.recLen / sr;
-    g.font = '600 22px system-ui';
-    g.textAlign = 'center';
-    g.fillText(`Recording base loop… ${secs.toFixed(1)} s`, W / 2, H / 2 + 8);
-    $('lTime').textContent = `${secs.toFixed(1)} s`;
-    return;
-  }
-  if (!loop.loopLen) {
-    g.clearRect(0, 0, W, H);
-    g.fillStyle = '#5a6170';
-    g.font = '18px system-ui';
-    g.textAlign = 'center';
-    g.fillText('Press Record (Space) and play — press again to close the loop', W / 2, H / 2 + 6);
-    $('lTime').textContent = '0.0 s';
-    return;
-  }
-  if (!loop.mix) {
-    loop.mix = document.createElement('canvas');
-    loop.mix.width = W; loop.mix.height = H;
-    drawWave(loop.mix, mixdown(), '#6aa8ff');
-  }
-  g.clearRect(0, 0, W, H);
-  g.drawImage(loop.mix, 0, 0);
-  const x = (loop.pos / loop.loopLen) * W;
-  g.fillStyle = loop.state === 'overdubbing' ? 'rgba(239,91,91,0.18)' : 'rgba(90,209,166,0.12)';
-  g.fillRect(0, 0, x, H);
-  g.fillStyle = loop.state === 'overdubbing' ? '#ef5b5b' : '#5ad1a6';
-  g.fillRect(x - 1, 0, 3, H);
-  $('lTime').textContent = `${(loop.pos / sr).toFixed(1)} / ${(loop.loopLen / sr).toFixed(1)} s`;
-}
-
 // ---------------------------------------------------------------- keys
 function onKey(e) {
-  if (e.target.matches('input[type=number], select') || e.ctrlKey || e.metaKey || e.altKey) return;
-  const k = e.key;
-  if (k === '1' || k === '2' || k === '3') showTab(['tuner', 'analyzer', 'looper'][Number(k) - 1]);
-  else if (k === ' ') { e.preventDefault(); mainButton(); }
-  else if (k === 's' || k === 'S') looperCmd('stop');
-  else if (k === 'z' && !e.shiftKey) looperCmd('undo');
-  else if (k === 'Z' || (k === 'z' && e.shiftKey)) looperCmd('redo');
-  else if (k === 'Delete') clearLoop();
-  else return;
+  if (e.target.matches?.('input[type=number], select') || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  if (e.key === '1' || e.key === '2' || e.key === '3') showTab(['tuner', 'analyzer', 'looper'][Number(e.key) - 1]);
+  else if (!station.onKey(e)) return;
   e.preventDefault();
 }
 
@@ -856,7 +663,7 @@ function frame(now) {
   } else if (settings.tab === 'tuner') {
     drawTuner(now);
   }
-  if (settings.tab === 'looper') drawLooper();
+  if (settings.tab === 'looper' && audio.ctx) station.frame(now);
 }
 
 setupControls();
