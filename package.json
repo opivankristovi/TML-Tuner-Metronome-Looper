@@ -1,0 +1,11 @@
+{
+  "name": "irig-instrument-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tuner, note/chord analyzer and looper for the iRig HD (browser, Web Audio)",
+  "scripts": {
+    "start": "./start.sh",
+    "test": "node test/dsp.test.js"
+  }
+}

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iRig Lab</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎸</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">iRig&nbsp;<b>Lab</b></div>
+
+    <div class="group">
+      <label>Input
+        <select id="device"><option value="">(start to list devices)</option></select>
+      </label>
+      <label>Channel
+        <select id="channel">
+          <option value="mix">Mix</option>
+          <option value="0">Left</option>
+          <option value="1">Right</option>
+        </select>
+      </label>
+      <button id="start" class="primary">Start audio</button>
+    </div>
+
+    <div class="group">
+      <label>Gain <input id="gain" type="range" min="0" max="24" step="0.5" value="0"><output id="gainOut">0 dB</output></label>
+      <div class="meter" title="Input level"><div id="meterFill"></div><div id="meterPeak"></div></div>
+      <span id="clip" class="clip">CLIP</span>
+    </div>
+
+    <div class="group">
+      <label class="check"><input id="monitor" type="checkbox"> Monitor</label>
+      <input id="monitorVol" type="range" min="0" max="1" step="0.01" value="0.8" title="Monitor volume">
+    </div>
+
+    <div class="group">
+      <label>Instrument <select id="instrument"></select></label>
+      <label>A4 <input id="a4" type="number" min="415" max="466" step="0.5" value="440"> Hz</label>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="tuner" class="active">Tuner <kbd>1</kbd></button>
+    <button role="tab" data-tab="analyzer">Note &amp; Chord <kbd>2</kbd></button>
+    <button role="tab" data-tab="looper">Looper <kbd>3</kbd></button>
+  </nav>
+
+  <div id="banner" class="banner">Plug your instrument into the iRig HD, then press <b>Start audio</b>.</div>
+
+  <main>
+    <!-- ------------------------------------------------------------ TUNER -->
+    <section id="tab-tuner" class="tab active">
+      <div class="tuner">
+        <div class="tuner-note">
+          <span id="tNote" class="big-note">–</span><span id="tOct" class="octave"></span>
+        </div>
+        <canvas id="gauge" width="760" height="300"></canvas>
+        <div class="readouts">
+          <div><span id="tCents">–</span><small>cents</small></div>
+          <div><span id="tFreq">–</span><small>Hz</small></div>
+          <div><span id="tTarget">–</span><small>target</small></div>
+        </div>
+        <div id="tHint" class="hint">&nbsp;</div>
+        <div class="strings">
+          <button id="stringAuto" class="string active">Auto</button>
+          <div id="stringBtns"></div>
+        </div>
+        <canvas id="history" width="900" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- ANALYZER -->
+    <section id="tab-analyzer" class="tab">
+      <div class="an-controls">
+        <div class="seg" id="anMode">
+          <button data-mode="auto" class="active">Auto</button>
+          <button data-mode="note">Single note</button>
+          <button data-mode="chord">Chord</button>
+        </div>
+        <label class="check"><input id="hold" type="checkbox"> Hold</label>
+        <label>Sensitivity <input id="sens" type="range" min="0.1" max="0.4" step="0.01" value="0.22"></label>
+      </div>
+
+      <div class="an-main">
+        <div class="an-result">
+          <div id="anName" class="big-chord">–</div>
+          <div id="anLong" class="an-long">Play a note or strum a chord</div>
+          <div id="anNotes" class="chips"></div>
+          <div id="anAlt" class="alts"></div>
+        </div>
+        <div class="an-board">
+          <div class="board-head">
+            <span id="anBoardTitle">Fretboard</span>
+            <span class="voicing">
+              <button id="vPrev" title="Previous voicing">‹</button>
+              <span id="vLabel"></span>
+              <button id="vNext" title="Next voicing">›</button>
+            </span>
+          </div>
+          <svg id="fretboard" class="fretboard"></svg>
+          <div id="anPositions" class="positions"></div>
+        </div>
+      </div>
+
+      <canvas id="spectrum" width="1200" height="200"></canvas>
+
+      <div class="history-strip">
+        <span>History</span>
+        <div id="anHistory"></div>
+        <button id="anHistClear" class="small">Clear</button>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------------- LOOPER -->
+    <section id="tab-looper" class="tab">
+      <div class="looper">
+        <div class="loop-top">
+          <div id="lState" class="lstate empty">EMPTY</div>
+          <div id="lTime" class="ltime">0.0 s</div>
+        </div>
+        <canvas id="loopWave" width="1200" height="180"></canvas>
+        <div class="loop-buttons">
+          <button id="lMain" class="lmain rec">● Record<kbd>Space</kbd></button>
+          <button id="lStop">■ Stop<kbd>S</kbd></button>
+          <button id="lUndo">↶ Undo<kbd>Z</kbd></button>
+          <button id="lRedo">↷ Redo<kbd>⇧Z</kbd></button>
+          <button id="lClear" class="danger">✕ Clear<kbd>Del</kbd></button>
+          <button id="lExport">⤓ Export WAV</button>
+        </div>
+        <div class="loop-settings">
+          <label>Loop volume <input id="lVol" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+          <label>Latency offset <input id="lLat" type="range" min="-50" max="150" step="1" value="0"><output id="lLatOut"></output></label>
+        </div>
+        <div id="layers" class="layers"></div>
+        <p class="help">
+          <b>Space</b> cycles Record → Play → Overdub → Play. The first recording sets the loop length.
+          Overdubs are shifted by the measured audio latency so they line up with what you heard;
+          if they sound late or early, nudge <i>Latency offset</i>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
