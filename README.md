@@ -4,6 +4,23 @@ Tuner, note/chord analyzer and looper for guitar or bass through an **IK Multime
 (or any audio input). It runs in the browser with the Web Audio API and needs no build step
 or dependencies.
 
+## Screenshots
+
+**Tuner**: an E string, 0.9 cents sharp, counted as in tune.
+
+![Tuner](docs/screenshots/tuner.png)
+
+**Note & Chord**: an open G chord named and laid out on the fretboard as `320003`.
+Dashed dots are octave doublings inferred from the shape.
+
+![Chord analyzer](docs/screenshots/chord-analyzer.png)
+
+**Looper**: overdubbing a second layer over a 3-second loop.
+
+![Looper](docs/screenshots/looper.png)
+
+The screenshots were captured from synthesized guitar signals.
+
 ## Run
 
 ```bash
