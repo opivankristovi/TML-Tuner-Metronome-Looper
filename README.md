@@ -5,8 +5,8 @@ Tuner, note/chord analyzer and 3-track loop station for guitar or bass through a
 or dependencies.
 
 **Try it online:**
-- **Desktop:** [https://opivankristovi.github.io/MS-R1-iRig-Lab/](https://opivankristovi.github.io/MS-R1-iRig-Lab/)
-- **Phone:** [https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/](https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/). Open it on an iPhone or Android phone and add it to the home screen.
+- **Desktop:** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/)
+- **Phone:** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/). Open it on an iPhone or Android phone and add it to the home screen.
 
 The phone version ([`mobile/`](mobile/README.md)) is a touchscreen fork that installs as an app and works
 with built-in, headset, USB (OTG) and Bluetooth microphones.
@@ -30,7 +30,7 @@ The screenshots were captured from synthesized guitar signals.
 
 ## Run
 
-The quickest way is the published page: [https://opivankristovi.github.io/MS-R1-iRig-Lab/](https://opivankristovi.github.io/MS-R1-iRig-Lab/), in Chromium, Chrome or Firefox.
+The quickest way is the published page: [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/), in Chromium, Chrome or Firefox.
 Locally, with the iRig HD set up automatically:
 
 ```bash

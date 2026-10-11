@@ -4,7 +4,7 @@ A phone and tablet fork of [iRig Lab](../README.md): the same tuner, chord finde
 loop station, rebuilt for touchscreens. It is an installable web app (PWA) that runs on
 **iPhone/iPad (Safari)** and **Android (Chrome)** from one codebase, with no app store needed.
 
-**Open it on your phone: [https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/](https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/)**
+**Open it on your phone: [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/)**
 
 It works with any microphone the phone can use:
 
@@ -50,7 +50,7 @@ by ear: record a few clicks along with the metronome and adjust until overdubs l
 
 Phones only allow the microphone on **HTTPS** pages, so the app has to be served over HTTPS:
 
-- **Published version (recommended):** [https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/](https://opivankristovi.github.io/MS-R1-iRig-Lab/mobile/). It is served from this repository by
+- **Published version (recommended):** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/). It is served from this repository by
   GitHub Pages and updates with every push to `main`. Open it on the phone, tap **Tap to start**,
   and allow the microphone. Then install it:
   - *iPhone:* Share › **Add to Home Screen**.
