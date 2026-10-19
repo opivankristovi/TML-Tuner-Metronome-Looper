@@ -158,12 +158,22 @@ export class PolyDetector {
     this.binHz = sampleRate / size;
   }
 
+  static HANN_TABLE = new Float64Array(131072);
+  static {
+    for (let i = 0; i < 131072; i++) {
+      this.HANN_TABLE[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / 131072);
+    }
+  }
+
   // Spectrum of the most recent `length` samples (Hann windowed, zero padded to size).
   spectrum(buf, length = this.size) {
     const N = this.size, { re, im, mag, win } = this;
     const L = Math.min(N, length, buf.length);
     this.lobe = (2 * N) / L; // Hann main-lobe half-width, in (zero-padded) bins
     if (L !== this.winLen) {
+      const step = 131071 / (L - 1);
+      const table = PolyDetector.HANN_TABLE;
+      for (let i = 0; i < L; i++) win[i] = table[(i * step) | 0];
       const phaseStep = (2 * Math.PI) / (L - 1);
       let cos = 1, sin = 0;
       const cosStep = Math.cos(phaseStep);
