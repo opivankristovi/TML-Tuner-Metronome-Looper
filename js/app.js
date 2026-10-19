@@ -492,7 +492,7 @@ function drawHistory(now) {
 }
 
 // ---------------------------------------------------------------- analyzer
-const an = { votes: new Map(), notes: [], key: '', keySince: 0, label: '', loggedKey: '', voicings: [], vIndex: 0, lastPoly: 0, lastSound: 0, lastOnset: -Infinity, history: [], mono: null, display: null };
+const an = { _keys: new Set(), votes: new Map(), notes: [], key: '', keySince: 0, label: '', loggedKey: '', voicings: [], vIndex: 0, lastPoly: 0, lastSound: 0, lastOnset: -Infinity, history: [], mono: null, display: null };
 
 function updateAnalyzer(buf, now) {
   const tuning = inst().tuning;
@@ -517,7 +517,10 @@ function updateAnalyzer(buf, now) {
     }
     const notes = sounding ? poly.analyze(buf, { minMidi, maxMidi, a4: settings.a4, relThreshold: settings.sens, gate: gate(), length }) : [];
     const present = new Map(notes.map((n) => [n.midi, n]));
-    for (const m of new Set([...an.votes.keys(), ...present.keys()])) {
+    an._keys.clear();
+    for (const m of an.votes.keys()) an._keys.add(m);
+    for (const m of present.keys()) an._keys.add(m);
+    for (const m of an._keys) {
       const v = an.votes.get(m) || { score: 0 };
       v.score = fresh ? 0.6 : v.score * 0.6 + (present.has(m) ? 0.4 : 0);
       if (present.has(m)) v.note = present.get(m);
