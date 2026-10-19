@@ -70,12 +70,12 @@ async function startAudio() {
   const gen = ++startGen;
   if (!audio.devices.length) await listDevices();
   const target = settings.deviceId;
-  const name = escapeHtml(deviceLabel(target));
+  const name = deviceLabel(target);
   banner(pendingOpen
-    ? `Waiting for <b>${escapeHtml(pendingOpen)}</b> to respond before opening <b>${name}</b>… (the browser opens one input at a time)`
-    : `Opening <b>${name}</b>…`);
+    ? safe`Waiting for <b>${pendingOpen}</b> to respond before opening <b>${name}</b>… (the browser opens one input at a time)`
+    : safe`Opening <b>${name}</b>…`);
   const slow = setTimeout(() => {
-    if (gen === startGen) banner(`<b>${name}</b> isn't responding. The browser gives up after about 30 s` + (audio.stream ? '; the current input keeps working meanwhile.' : '.'), true);
+    if (gen === startGen) banner(safe`<b>${name}</b> isn't responding. The browser gives up after about 30 s${audio.stream ? '; the current input keeps working meanwhile.' : '.'}`, true);
   }, 3000);
   const opening = deviceLabel(target);
   pendingOpen ??= opening;
@@ -116,8 +116,7 @@ async function startAudio() {
     station.updateLatency(audio.stream);
     setTimeout(() => station.updateLatency(audio.stream), 1500); // outputLatency is only known once the context runs
     const label = track?.label || 'input';
-    banner((missing ? 'The saved input is not connected, so the default input is used. ' : '') +
-      `Listening on <b>${escapeHtml(label)}</b> · ${audio.ctx.sampleRate} Hz`);
+    banner(safe`${missing ? 'The saved input is not connected, so the default input is used. ' : ''}Listening on <b>${label}</b> · ${audio.ctx.sampleRate} Hz`);
     $('start').textContent = 'Restart audio';
     $('start').classList.remove('primary');
   } catch (err) {
@@ -129,14 +128,14 @@ async function startAudio() {
       settings.deviceId = currentDeviceId();
       save();
       await listDevices();
-      banner(`Could not open <b>${escapeHtml(opening)}</b>: ${escapeHtml(why)}. Still listening on <b>${escapeHtml(audio.stream.getAudioTracks()[0]?.label || 'the previous input')}</b>.`, true);
+      banner(safe`Could not open <b>${opening}</b>: ${why}. Still listening on <b>${audio.stream.getAudioTracks()[0]?.label || 'the previous input'}</b>.`, true);
     } else if (target && err.name !== 'NotAllowedError') {
-      banner(`Could not open <b>${escapeHtml(opening)}</b>: ${escapeHtml(why)}. Trying the default input…`, true);
+      banner(safe`Could not open <b>${opening}</b>: ${why}. Trying the default input…`, true);
       settings.deviceId = 'default';
       save();
       return startAudio();
     } else {
-      banner(`Could not open audio input: ${escapeHtml(why)}`, true);
+      banner(safe`Could not open audio input: ${why}`, true);
     }
   } finally {
     clearTimeout(slow);
@@ -204,7 +203,7 @@ function applyDeviceProfile(id) {
 }
 
 function onDeviceLost(label) {
-  banner(`<b>${escapeHtml(label || 'The input')}</b> was disconnected. Pick another input under <b>Input</b>, or plug it back in.`, true);
+  banner(safe`<b>${label || 'The input'}</b> was disconnected. Pick another input under <b>Input</b>, or plug it back in.`, true);
 }
 
 // Hot-plugging: refresh the menu, offer newly connected inputs, recover when ours vanished
@@ -220,8 +219,13 @@ async function onDeviceChange() {
   }
   const added = devices.find((d) => !before.has(d.deviceId) && d.deviceId !== 'default' && d.deviceId !== 'communications' && d.label);
   if (added && before.size) {
-    banner(`New input connected: <b>${escapeHtml(added.label)}</b> <button id="useNew" class="small">Use it</button>`);
-    $('useNew').onclick = () => switchDevice(added.deviceId);
+    banner(safe`New input connected: <b>${added.label}</b> `);
+    const btn = document.createElement('button');
+    btn.id = 'useNew';
+    btn.className = 'small';
+    btn.textContent = 'Use it';
+    btn.onclick = () => switchDevice(added.deviceId);
+    $('banner').appendChild(btn);
   }
 }
 
@@ -234,13 +238,22 @@ function applyMonitor() {
 }
 
 // ----------------------------------------------------------------- UI basics
-function banner(html, error = false) {
+function banner(content, error = false) {
   const b = $('banner');
-  b.innerHTML = html;
+  if (content?.__html !== undefined) {
+    b.innerHTML = content.__html;
+  } else if (content instanceof Node) {
+    b.replaceChildren(content);
+  } else {
+    b.textContent = content;
+  }
   b.classList.toggle('error', error);
   b.classList.remove('hidden');
 }
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function safe(strings, ...values) {
+  return { __html: strings.reduce((acc, str, i) => acc + str + (i < values.length ? escapeHtml(values[i]) : ''), '') };
+}
 
 function setupControls() {
   const instSel = $('instrument');
@@ -778,9 +791,9 @@ function checkDeadInput(buf, now) {
   if (pendingOpen) { dead.lastSignal = now; return; } // a device switch is in progress
   if (!dead.warned && now - dead.lastSignal > 3000 && audio.ctx.state === 'running') {
     dead.warned = true;
-    banner('The input delivers pure digital silence, so the device is not streaming. On Linux, run ' +
+    banner({ __html: 'The input delivers pure digital silence, so the device is not streaming. On Linux, run ' +
       '<code>journalctl -k | grep usb_set_interface</code>: errors there mean the USB port can\'t run the iRig HD\'s audio stream. ' +
-      'Unplug and replug it, preferably through a USB&nbsp;2.0 hub or into another port, then press <b>Restart audio</b>.', true);
+      'Unplug and replug it, preferably through a USB&nbsp;2.0 hub or into another port, then press <b>Restart audio</b>.' }, true);
   }
 }
 

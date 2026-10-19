@@ -37,7 +37,7 @@ export function createStation({ settings, save, banner }) {
     }
     sendSettings();
     for (let i = 0; i < TRACKS; i++) post({ cmd: 'gain', track: i, value: settings.trackGains[i] });
-    if (!s.shared) banner('Loop buffers are not shared (open the app through <code>start.sh</code>): waveforms and export use copies.', false);
+    if (!s.shared) banner({ __html: 'Loop buffers are not shared (open the app through <code>start.sh</code>): waveforms and export use copies.' }, false);
   }
 
   // Shared memory lets the UI read loops directly; otherwise buffers are transferred.
@@ -49,7 +49,7 @@ export function createStation({ settings, save, banner }) {
     s.node.port.postMessage(msg, data && !s.shared ? [data.buffer] : []);
   }
   const cmd = (msg) => {
-    if (!s.node) { banner('Start audio first to use the loop station.', true); return; }
+    if (!s.node) { banner({ __html: 'Start audio first to use the loop station.' }, true); return; }
     post(msg);
   };
 
