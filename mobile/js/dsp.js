@@ -172,7 +172,7 @@ export class PolyDetector {
     re.fill(0, L); im.fill(0, L);
     this.fft.transform(re, im);
     // Mild magnitude compression evens out the strong fundamentals of DI signals
-    for (let k = 0; k < N / 2; k++) mag[k] = Math.pow(re[k] * re[k] + im[k] * im[k], 0.25);
+    for (let k = 0; k < N / 2; k++) mag[k] = Math.sqrt(Math.sqrt(re[k] * re[k] + im[k] * im[k]));
     return mag;
   }
 

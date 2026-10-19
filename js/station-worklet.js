@@ -156,7 +156,17 @@ class StationProcessor extends AudioWorkletProcessor {
         break;
       case 'playAll': this.playAll(); break;
       case 'stopAll': this.stopAll(); break;
-      case 'toggleAll': this.tracks.some((x) => x.state === 'playing' || x.state === 'dubbing' || x.state === 'recording') || this.running ? this.stopAll() : this.playAll(); break;
+      case 'toggleAll': {
+        const isAnyPlaying = this.tracks.some((x) =>
+          x.state === 'playing' || x.state === 'dubbing' || x.state === 'recording'
+        );
+        if (isAnyPlaying || this.running) {
+          this.stopAll();
+        } else {
+          this.playAll();
+        }
+        break;
+      }
       case 'snapshot':
         // Fallback for when buffers aren't shared: copy the mix out (may click once)
         if (tr.len) {
@@ -425,7 +435,8 @@ class StationProcessor extends AudioWorkletProcessor {
         if (counting) {
           this.addVoice(i === 0 ? this.sounds.a : this.sounds.c, 1);
         } else {
-          for (const [voice, hits] of Object.entries(this.pattern.p)) {
+          for (const voice in this.pattern.p) {
+            const hits = this.pattern.p[voice];
             const v = VELOCITY[hits[i]];
             if (v && this.sounds[voice]) this.addVoice(this.sounds[voice], v);
           }
@@ -466,7 +477,12 @@ class StationProcessor extends AudioWorkletProcessor {
               else tr.rec[idx] = x;
             }
           }
-          if (tr.state === 'recording' && t >= tr.limitT) { this.apply(tr, { target: 'playing', at: tr.limitT }); tr.queue = []; this.updateNextEvent(); this.dirty = true; }
+          if (tr.state === 'recording' && t >= tr.limitT) {
+            this.apply(tr, { target: 'playing', at: tr.limitT });
+            tr.queue = [];
+            this.updateNextEvent();
+            this.dirty = true;
+          }
           const len = tr.len;
           if (!len) continue;
           const dub = tr.dub;
