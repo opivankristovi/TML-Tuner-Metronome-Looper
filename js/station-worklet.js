@@ -466,7 +466,12 @@ class StationProcessor extends AudioWorkletProcessor {
               else tr.rec[idx] = x;
             }
           }
-          if (tr.state === 'recording' && t >= tr.limitT) { this.apply(tr, { target: 'playing', at: tr.limitT }); tr.queue = []; this.updateNextEvent(); this.dirty = true; }
+          if (tr.state === 'recording' && t >= tr.limitT) {
+            this.apply(tr, { target: 'playing', at: tr.limitT });
+            tr.queue = [];
+            this.updateNextEvent();
+            this.dirty = true;
+          }
           const len = tr.len;
           if (!len) continue;
           const dub = tr.dub;
