@@ -164,7 +164,17 @@ export class PolyDetector {
     const L = Math.min(N, length, buf.length);
     this.lobe = (2 * N) / L; // Hann main-lobe half-width, in (zero-padded) bins
     if (L !== this.winLen) {
-      for (let i = 0; i < L; i++) win[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (L - 1));
+      const phaseStep = (2 * Math.PI) / (L - 1);
+      let cos = 1, sin = 0;
+      const cosStep = Math.cos(phaseStep);
+      const sinStep = Math.sin(phaseStep);
+      for (let i = 0; i < L; i++) {
+        win[i] = 0.5 - 0.5 * cos;
+        const nextCos = cos * cosStep - sin * sinStep;
+        const nextSin = sin * cosStep + cos * sinStep;
+        cos = nextCos;
+        sin = nextSin;
+      }
       this.winLen = L;
     }
     const off = buf.length - L;
