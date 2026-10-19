@@ -425,7 +425,8 @@ class StationProcessor extends AudioWorkletProcessor {
         if (counting) {
           this.addVoice(i === 0 ? this.sounds.a : this.sounds.c, 1);
         } else {
-          for (const [voice, hits] of Object.entries(this.pattern.p)) {
+          for (const voice in this.pattern.p) {
+            const hits = this.pattern.p[voice];
             const v = VELOCITY[hits[i]];
             if (v && this.sounds[voice]) this.addVoice(this.sounds[voice], v);
           }
