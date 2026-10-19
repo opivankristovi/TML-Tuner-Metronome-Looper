@@ -174,6 +174,17 @@ export class PolyDetector {
       const step = 131071 / (L - 1);
       const table = PolyDetector.HANN_TABLE;
       for (let i = 0; i < L; i++) win[i] = table[(i * step) | 0];
+      const phaseStep = (2 * Math.PI) / (L - 1);
+      let cos = 1, sin = 0;
+      const cosStep = Math.cos(phaseStep);
+      const sinStep = Math.sin(phaseStep);
+      for (let i = 0; i < L; i++) {
+        win[i] = 0.5 - 0.5 * cos;
+        const nextCos = cos * cosStep - sin * sinStep;
+        const nextSin = sin * cosStep + cos * sinStep;
+        cos = nextCos;
+        sin = nextSin;
+      }
       this.winLen = L;
     }
     const off = buf.length - L;
@@ -181,7 +192,7 @@ export class PolyDetector {
     re.fill(0, L); im.fill(0, L);
     this.fft.transform(re, im);
     // Mild magnitude compression evens out the strong fundamentals of DI signals
-    for (let k = 0; k < N / 2; k++) mag[k] = Math.pow(re[k] * re[k] + im[k] * im[k], 0.25);
+    for (let k = 0; k < N / 2; k++) mag[k] = Math.sqrt(Math.sqrt(re[k] * re[k] + im[k] * im[k]));
     return mag;
   }
 
