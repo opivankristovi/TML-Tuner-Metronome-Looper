@@ -156,7 +156,17 @@ class StationProcessor extends AudioWorkletProcessor {
         break;
       case 'playAll': this.playAll(); break;
       case 'stopAll': this.stopAll(); break;
-      case 'toggleAll': this.tracks.some((x) => x.state === 'playing' || x.state === 'dubbing' || x.state === 'recording') || this.running ? this.stopAll() : this.playAll(); break;
+      case 'toggleAll': {
+        const isAnyPlaying = this.tracks.some((x) =>
+          x.state === 'playing' || x.state === 'dubbing' || x.state === 'recording'
+        );
+        if (isAnyPlaying || this.running) {
+          this.stopAll();
+        } else {
+          this.playAll();
+        }
+        break;
+      }
       case 'snapshot':
         // Fallback for when buffers aren't shared: copy the mix out (may click once)
         if (tr.len) {
