@@ -55,13 +55,23 @@
         <div class="seg" id="anMode">
           <button data-mode="auto">Auto</button>
           <button data-mode="note">Note</button>
-          <button data-mode="chord">Chord</button>
+          <button data-mode="chord">Chord <span class="exp">exp</span></button>
         </div>
         <label class="toggle"><input id="hold" type="checkbox"><span>Hold</span></label>
+      </div>
+      <div class="card gate-card">
+        <div class="row">
+          <div class="gate" aria-label="Input level, background noise and threshold">
+            <div id="gmLevel" class="gate-level"></div><div id="gmFloor" class="gate-floor"></div><div id="gmTh" class="gate-th"></div>
+          </div>
+          <span id="gmState" class="gate-state">Quiet</span>
+        </div>
+        <label class="field">Noise threshold <input id="anGate" type="range" min="3" max="30" step="1"><output id="anGateOut"></output></label>
       </div>
       <div class="card result">
         <div id="anName" class="big-chord">–</div>
         <div id="anLong" class="an-long">Play a note or strum a chord</div>
+        <div id="anExp" class="exp-note" hidden><span class="exp">experimental</span> Chord detection works best with a clean signal and may still get a note wrong.</div>
         <div id="anNotes" class="chips"></div>
         <div id="anAlt" class="alts"></div>
       </div>
@@ -86,6 +96,7 @@
         <summary>Detection</summary>
         <label class="field">Sensitivity <input id="sens" type="range" min="0.1" max="0.4" step="0.01"></label>
         <p class="note">Higher is stricter: fewer false notes, but quiet strings may be missed.</p>
+        <p class="note">Noise threshold: how far above the room's background (fans, hum) a sound must be before it is analysed. Raise it if background noise still shows notes; lower it if soft playing is missed.</p>
       </details>
     </section>
 

@@ -174,3 +174,16 @@ canvas { width: 100%; display: block; }
 .tvol { justify-content: space-between; }
 .tvol input { flex: 1; }
 .help { color: var(--muted); font-size: 13px; margin-top: 16px; line-height: 1.6; }
+
+/* Analyzer noise gate and experimental labels */
+.gate { position: relative; width: 150px; height: 10px; background: #0b0d10; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; flex: none; }
+.gate-level { height: 100%; width: 0; background: #3b4253; }
+.gate-floor, .gate-th { position: absolute; top: -1px; bottom: -1px; width: 2px; left: 0; }
+.gate-floor { background: var(--muted); }
+.gate-th { background: var(--warn); }
+.gate-state { font-size: 12px; color: var(--muted); min-width: 120px; }
+.gate-state.on { color: var(--accent); font-weight: 600; }
+.exp { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; vertical-align: middle; }
+.seg button.active .exp { color: #062418; }
+.exp-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: -6px 0 12px; }
+.exp-note[hidden] { display: none; }

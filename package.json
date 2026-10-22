@@ -6,6 +6,6 @@
   "description": "Tuner, note/chord analyzer and looper for the iRig HD (browser, Web Audio)",
   "scripts": {
     "start": "./start.sh",
-    "test": "node test/dsp.test.js && node test/station.test.js"
+    "test": "node test/dsp.test.js && node test/station.test.js && node test/analysis.test.js"
   }
 }

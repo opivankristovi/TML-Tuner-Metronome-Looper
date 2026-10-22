@@ -6,6 +6,6 @@
   "description": "Mobile (PWA) fork of iRig Lab: tuner, chord finder and loop station for phones",
   "scripts": {
     "start": "python3 serve.py",
-    "test": "node test/dsp.test.js && node test/station.test.js && node test/calibrate.test.js"
+    "test": "node test/dsp.test.js && node test/station.test.js && node test/calibrate.test.js && node test/analysis.test.js"
   }
 }

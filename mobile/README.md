@@ -19,9 +19,15 @@ It works with any microphone the phone can use:
 
 - **Tuner**: a big note name and needle gauge, a cents/Hz readout, string buttons (tap one
   to lock the target), a drift graph, and 13 guitar and bass tunings.
-- **Chords**: single notes and chords. Each chord is drawn as a **chord box** (strings top to
-  bottom, as in chord books); swipe or use ‹ › to see other voicings. For a single note, the
-  neck shows every place to play it.
+- **Chords**: single notes and chords (chord detection is *experimental*). Each chord is drawn
+  as a **chord box** (strings top to bottom, as in chord books); swipe or use ‹ › to see other
+  voicings. For a single note, the neck shows every place to play it.
+  - **Noise threshold**: only sound this far above the room's background (fans, hum) is
+    analysed. The meter shows the level, the background (grey mark) and the threshold (yellow
+    mark). Raise it if background noise still shows notes; lower it if soft playing is missed.
+  - Through the phone's microphone it usually gets the chord right but may miss or add a note,
+    most often the bass. How it works: see *How the chord analysis works* in the
+    [main README](../README.md).
 - **Loops**: the 3-track loop station.
   - Big **Rec / Play / Dub** and **Stop** pads per track. They fire on *touch-down*, not release,
     so the timing follows your finger. Android also gives a short vibration.
@@ -91,12 +97,13 @@ between the audio thread and the UI (on the first visit the page reloads itself 
 | `js/station-worklet.js` | Loop engine (same as the desktop app) plus the calibration clicks |
 | `js/calibrate.js` | Matched-filter latency measurement |
 | `js/fretboard.js` | Portrait chord boxes and neck |
-| `js/dsp.js`, `instruments.js`, `rhythms.js`, `wav.js` | Copied unchanged from the desktop app |
+| `js/dsp.js`, `analysis.js`, `instruments.js`, `rhythms.js`, `wav.js` | Copied unchanged from the desktop app |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support, isolation headers, install metadata |
 | `serve.py` | Dev server (HTTP or self-signed HTTPS for phones on the LAN) |
 
-`npm test` runs the pitch/chord tests, the loop-engine tests and the calibration tests (the
-calibration test simulates speaker → room → mic paths from 28 ms to 240 ms, with noise and hum).
+`npm test` runs the pitch/chord tests, the loop-engine tests, the calibration tests (the
+calibration test simulates speaker → room → mic paths from 28 ms to 240 ms, with noise and hum)
+and the microphone chord-tracking tests (fan noise, hum, room reflections, strummed chords).
 
 This folder doesn't import anything from the desktop app, so it can be split into its own
 repository at any time (`git subtree split --prefix mobile`).

@@ -78,16 +78,22 @@
         <div class="seg" id="anMode">
           <button data-mode="auto" class="active">Auto</button>
           <button data-mode="note">Single note</button>
-          <button data-mode="chord">Chord</button>
+          <button data-mode="chord">Chord <span class="exp">experimental</span></button>
         </div>
         <label class="check"><input id="hold" type="checkbox"> Hold</label>
-        <label>Sensitivity <input id="sens" type="range" min="0.1" max="0.4" step="0.01" value="0.22"></label>
+        <label title="Higher is stricter: fewer false notes, but quiet strings may be missed">Sensitivity <input id="sens" type="range" min="0.1" max="0.4" step="0.01" value="0.22"></label>
+        <label title="How far above the room's background noise a sound must be before it is analysed. Raise it if fans or hum still trigger notes; lower it if soft playing is missed.">Noise threshold <input id="anGate" type="range" min="3" max="30" step="1"><output id="anGateOut"></output></label>
+        <div class="gate" title="Input level (bar), background noise (grey mark) and threshold (yellow mark)">
+          <div id="gmLevel" class="gate-level"></div><div id="gmFloor" class="gate-floor"></div><div id="gmTh" class="gate-th"></div>
+        </div>
+        <span id="gmState" class="gate-state">Quiet</span>
       </div>
 
       <div class="an-main">
         <div class="an-result">
           <div id="anName" class="big-chord">–</div>
           <div id="anLong" class="an-long">Play a note or strum a chord</div>
+          <div id="anExp" class="exp-note" hidden><span class="exp">experimental</span> Chord detection works best with a clean signal (iRig or a mic close to the guitar) and may still get a note wrong.</div>
           <div id="anNotes" class="chips"></div>
           <div id="anAlt" class="alts"></div>
         </div>

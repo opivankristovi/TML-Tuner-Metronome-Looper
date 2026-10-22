@@ -1,10 +1,10 @@
 // Service worker: works offline, and adds the cross-origin isolation headers (COOP/COEP)
 // that static hosts like GitHub Pages can't send. Isolation enables SharedArrayBuffer, which
 // the loop station uses to share loop buffers between the audio thread and the UI.
-const CACHE = 'irig-lab-mobile-v1';
+const CACHE = 'irig-lab-mobile-v2';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/station.js', 'js/station-worklet.js', 'js/calibrate.js', 'js/dsp.js',
+  'js/app.js', 'js/analysis.js', 'js/station.js', 'js/station-worklet.js', 'js/calibrate.js', 'js/dsp.js',
   'js/fretboard.js', 'js/instruments.js', 'js/rhythms.js', 'js/wav.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];

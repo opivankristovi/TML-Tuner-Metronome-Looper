@@ -1,4 +1,5 @@
-import { PitchDetector, PolyDetector, nameChord, findFingerings, findOnset, positionsFor, freqToMidi, midiToFreq, noteName, NOTE_NAMES, pc, rmsOf } from './dsp.js';
+import { PitchDetector, nameChord, findFingerings, positionsFor, freqToMidi, midiToFreq, noteName, NOTE_NAMES, pc, rmsOf } from './dsp.js';
+import { ChordTracker } from './analysis.js';
 import { INSTRUMENTS, isBass } from './instruments.js';
 import { renderFretboard } from './fretboard.js';
 import { createStation } from './station.js';
@@ -27,7 +28,7 @@ const gate = () => Math.min(0.01, Math.max(GATE, noise.floor * 2));
 // ------------------------------------------------------------- settings
 const settings = Object.assign(
   {
-    deviceId: '', channel: 'mix', gain: 0, monitor: false, monitorVol: 0.8, instrument: 'gtr-std', a4: 440, tab: 'tuner', anMode: 'auto', sens: 0.22,
+    deviceId: '', channel: 'mix', gain: 0, monitor: false, monitorVol: 0.8, instrument: 'gtr-std', a4: 440, tab: 'tuner', anMode: 'auto', sens: 0.22, anGate: 9,
     loopVol: 1, latOffset: 0, bpm: 100, rhythm: 'click-4', metronome: false, metroVol: 0.7, countIn: true, quantize: 'bar', recBars: 0, trackGains: [1, 1, 1], devices: {},
   },
   load()
@@ -41,7 +42,7 @@ const inst = () => INSTRUMENTS.find((i) => i.id === settings.instrument) || INST
 
 // ---------------------------------------------------------------- audio
 const audio = { ctx: null, stream: null, source: null, splitter: null, input: null, analyser: null, monitor: null, buf: null, devices: [] };
-let pitch4k, pitch8k, poly;
+let pitch4k, pitch8k, poly, tracker;
 
 async function buildGraph() {
   const ctx = new AudioContext({ latencyHint: 'interactive' });
@@ -55,7 +56,8 @@ async function buildGraph() {
   audio.buf = new Float32Array(audio.analyser.fftSize);
   pitch4k = new PitchDetector(4096, ctx.sampleRate);
   pitch8k = new PitchDetector(8192, ctx.sampleRate);
-  poly = new PolyDetector(32768, ctx.sampleRate);
+  tracker = new ChordTracker(ctx.sampleRate, { marginDb: settings.anGate, sens: settings.sens });
+  poly = tracker.poly;
   applyGain(); applyMonitor();
 }
 
@@ -109,6 +111,7 @@ async function startAudio() {
     track.onended = () => onDeviceLost(track.label);
     applyDeviceProfile(currentDeviceId());
     connectSource();
+    tracker?.reset();
     noise.floor = 0;
     noise.buckets = [];
     dead.lastSignal = 0;
@@ -297,6 +300,9 @@ function setupControls() {
     b.onclick = () => { settings.anMode = b.dataset.mode; save(); syncSeg(); };
   }
   syncSeg();
+  $('anGate').value = settings.anGate;
+  $('anGateOut').textContent = `${settings.anGate} dB`;
+  $('anGate').oninput = () => { settings.anGate = Number($('anGate').value); $('anGateOut').textContent = `${settings.anGate} dB`; save(); };
   $('sens').value = settings.sens;
   $('sens').oninput = () => { settings.sens = Number($('sens').value); save(); };
   $('vPrev').onclick = () => cycleVoicing(-1);
@@ -337,7 +343,6 @@ function onInstrumentChange() {
   syncStringButtons();
   an.key = '';
   an.notes = [];
-  an.votes.clear();
   renderAnalyzer(true);
 }
 
@@ -505,55 +510,47 @@ function drawHistory(now) {
 }
 
 // ---------------------------------------------------------------- analyzer
-const an = { _keys: new Set(), votes: new Map(), notes: [], key: '', keySince: 0, label: '', loggedKey: '', voicings: [], vIndex: 0, lastPoly: 0, lastSound: 0, lastOnset: -Infinity, history: [], mono: null, display: null };
+const an = { notes: [], key: '', keySince: 0, label: '', loggedKey: '', voicings: [], vIndex: 0, lastSound: 0, history: [], mono: null, display: null };
 
 function updateAnalyzer(buf, now) {
   const tuning = inst().tuning;
   const minMidi = Math.min(...tuning) - 1;
   const maxMidi = Math.min(96, Math.max(...tuning) + inst().frets);
-  const sounding = rmsOf(buf, 4096) > gate();
-  if (sounding) an.lastSound = now;
-  an.mono = sounding ? detectMono(buf) : null;
-
-  if (now - an.lastPoly > 110) {
-    an.lastPoly = now;
-    // Analyse only what was played after the latest pick attack, once enough of it has arrived;
-    // the attack itself is broadband noise and the previous chord would blur the result.
-    const sr = audio.ctx.sampleRate;
-    const onset = findOnset(buf, { gate: gate() });
-    let length = poly.size, fresh = false;
-    if (onset >= 0) {
-      length = buf.length - onset - Math.round(sr * 0.03);
-      const at = audio.ctx.currentTime * sr - (buf.length - onset);
-      if (length < sr * 0.2) return renderAnalyzer(false, now); // still settling
-      if (at - an.lastOnset > 4096) { an.lastOnset = at; an.votes.clear(); fresh = true; }
-    }
-    const notes = sounding ? poly.analyze(buf, { minMidi, maxMidi, a4: settings.a4, relThreshold: settings.sens, gate: gate(), length }) : [];
-    const present = new Map(notes.map((n) => [n.midi, n]));
-    an._keys.clear();
-    for (const m of an.votes.keys()) an._keys.add(m);
-    for (const m of present.keys()) an._keys.add(m);
-    for (const m of an._keys) {
-      const v = an.votes.get(m) || { score: 0 };
-      v.score = fresh ? 0.6 : v.score * 0.6 + (present.has(m) ? 0.4 : 0);
-      if (present.has(m)) v.note = present.get(m);
-      if (v.score < 0.05) an.votes.delete(m); else an.votes.set(m, v);
-    }
-    const stable = [...an.votes.entries()].filter(([, v]) => v.score > 0.55).map(([, v]) => v.note).sort((a, b) => a.midi - b.midi);
-    if (!($('hold').checked && !stable.length)) an.notes = stable;
-    drawSpectrum(notes);
-  }
+  tracker.marginDb = settings.anGate;
+  tracker.sens = settings.sens;
+  const end = Math.round(audio.ctx.currentTime * audio.ctx.sampleRate);
+  const res = tracker.update(buf, { end, now, minMidi, maxMidi, a4: settings.a4 });
+  // Only what is played above the room's background is analysed (see analysis.js)
+  an.mono = tracker.active ? detectMono(buf) : null;
+  if (tracker.active) an.lastSound = now;
+  if (res.analysed) drawSpectrum(tracker.detections);
+  an.notes = tracker.fresh ? tracker.notes : [];
+  renderGate();
   renderAnalyzer(false, now);
 }
 
+// Level meter for the analyzer: input level, background noise and threshold
+function renderGate() {
+  const pct = (x) => `${Math.max(0, Math.min(100, ((20 * Math.log10(x + 1e-9) + 80) / 80) * 100))}%`;
+  $('gmLevel').style.width = pct(tracker.level);
+  $('gmFloor').style.left = pct(tracker.floor.value);
+  $('gmTh').style.left = pct(tracker.threshold);
+  const state = $('gmState');
+  const listening = tracker.active;
+  state.textContent = listening ? 'Listening' : tracker.level > 0.0025 ? 'Background ignored' : 'Quiet';
+  state.className = 'gate-state' + (listening ? ' on' : '');
+}
+
 function chooseDisplay() {
+  if (!tracker?.active) return null;
   const mode = settings.anMode;
   const pcs = new Set(an.notes.map((n) => pc(n.midi)));
-  if (mode === 'chord' || (mode === 'auto' && pcs.size >= 2)) {
-    if (!an.notes.length) return null;
-    return { kind: 'chord', notes: an.notes };
+  // A clearly periodic sound is one note, even if the chord detector hears an extra overtone
+  const monophonic = an.mono && an.mono.clarity >= 0.9 && pcs.size < 3;
+  if (mode === 'chord' || (mode === 'auto' && pcs.size >= 2 && !monophonic)) {
+    return an.notes.length ? { kind: 'chord', notes: an.notes } : null;
   }
-  // Single note: prefer the monophonic detector (more precise), else the lowest poly note
+  // Single note: prefer the monophonic detector (more precise), else the lowest chord-detector note
   if (an.mono) {
     const m = freqToMidi(an.mono.freq, settings.a4);
     return { kind: 'note', midi: Math.round(m), cents: (m - Math.round(m)) * 100, freq: an.mono.freq };
@@ -572,6 +569,7 @@ function renderAnalyzer(force, now = performance.now()) {
   if (!d && $('hold').checked) d = an.display;
   if (!d && an.display && now - an.lastSound < 2500) d = an.display;
   $('anName').classList.toggle('stale', !fresh);
+  $('anExp').hidden = d?.kind !== 'chord';
 
   if (!d) {
     if (!force && !an.display) return;

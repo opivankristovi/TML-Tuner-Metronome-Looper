@@ -152,6 +152,7 @@ export class PolyDetector {
     this.re = new Float64Array(size);
     this.im = new Float64Array(size);
     this.mag = new Float64Array(size / 2);
+    this.rawMag = new Float64Array(size / 2); // before background subtraction
     this.residual = new Float64Array(size / 2);
     this.win = new Float64Array(size);
     this.winLen = 0;
@@ -186,6 +187,20 @@ export class PolyDetector {
     return mag;
   }
 
+  // Subtract a learned background spectrum (full-length window, same units) from mag.
+  // Shorter windows smear peaks over more bins and scale levels, so the background is
+  // widened by the main lobe and rescaled before subtracting.
+  subtractBackground(bg, length) {
+    const { mag } = this;
+    const scale = Math.pow(Math.min(1, length / this.size), 0.25) * 1.3;
+    const w = Math.ceil(this.lobe);
+    for (let k = 0; k < mag.length; k++) {
+      let b = 0;
+      for (let j = Math.max(0, k - w), e = Math.min(mag.length - 1, k + w); j <= e; j++) if (bg[j] > b) b = bg[j];
+      mag[k] = Math.max(0, mag[k] - b * scale);
+    }
+  }
+
   // Relative search tolerance for harmonic h: string partials run sharp as h grows
   static tolerance(h) {
     return Math.min(0.04, 0.01 + 0.00005 * h * h);
@@ -209,6 +224,29 @@ export class PolyDetector {
     return s;
   }
 
+  // Median magnitude of the original spectrum around a bin: the local noise floor
+  localFloor(bin) {
+    let v = this.floorCache.get(bin);
+    if (v !== undefined) return v;
+    const w = Math.round(Math.max(24, 6 * this.lobe, 0.1 * bin));
+    const lo = Math.max(1, bin - w), hi = Math.min(this.mag.length - 1, bin + w);
+    const vals = Array.from(this.rawMag.subarray(lo, hi + 1)).sort((a, b) => a - b);
+    v = vals[vals.length >> 1];
+    this.floorCache.set(bin, v);
+    return v;
+  }
+
+  // A low string's fundamental can drown in rumble while its overtones stay clear: accept a
+  // weak but present fundamental when the 2nd and 3rd harmonics both stand out.
+  harmonicsStandOut(f0, fund, fb, minSnr) {
+    if (fund < 1.3 * this.localFloor(fb)) return false;
+    for (const h of [2, 3]) {
+      const [v, b] = this.peakAt(this.rawMag, h * f0, h);
+      if (b < 0 || v < minSnr * this.localFloor(b)) return false;
+    }
+    return true;
+  }
+
   // Spectral level near frequency f in the last analysed frame, relative to its peak (0..1)
   levelAt(f) {
     return this.magMax ? this.peakAt(this.mag, f)[0] / this.magMax : 0;
@@ -223,15 +261,21 @@ export class PolyDetector {
 
   // Returns detected notes [{midi, freq, cents, strength}] sorted by pitch.
   // `length` limits analysis to the most recent samples (e.g. since the last pick attack).
-  analyze(buf, { minMidi = 28, maxMidi = 88, a4 = 440, maxNotes = 6, relThreshold = 0.22, fundRatio = 0.08, harmonicKeep = 0.75, gate = 0.002, length = this.size } = {}) {
+  // `minSnr`: a note's fundamental must stand this far above the median spectrum around it
+  // (in |X|^0.5 units; 2.2 ≈ 14 dB), so broadband noise such as fans doesn't produce notes.
+  // `background`: learned spectrum of the room (see subtractBackground), removes steady hum.
+  analyze(buf, { minMidi = 28, maxMidi = 88, a4 = 440, maxNotes = 6, relThreshold = 0.22, fundRatio = 0.08, harmonicKeep = 0.75, gate = 0.002, length = this.size, minSnr = 2.2, background = null } = {}) {
     const L = Math.min(this.size, length, buf.length);
     if (rmsOf(buf, L) < gate) return [];
     const mag = this.spectrum(buf, L);
+    this.rawMag.set(mag);
+    if (background) this.subtractBackground(background, L);
     const res = this.residual;
     res.set(mag);
     let globalMax = 0;
     for (let k = 1; k < mag.length; k++) if (mag[k] > globalMax) globalMax = mag[k];
     this.magMax = globalMax;
+    this.floorCache = new Map();
     if (globalMax <= 0) return [];
     const fmax = Math.min(6000, this.sr / 2 - 100);
 
@@ -248,6 +292,7 @@ export class PolyDetector {
           if (fund < fundRatio * globalMax) continue;
           // The fundamental must be a real peak, not the skirt of a neighbouring note
           if (res[fb - 1] > fund || res[fb + 1] > fund) continue;
+          if (minSnr && fund < minSnr * this.localFloor(fb) && !this.harmonicsStandOut(f0, fund, fb, minSnr)) continue;
           // A partial of an already-found note only counts as a new note if most of
           // its energy is still unexplained after subtraction.
           if (this.isHarmonicOf(f0, notes) && fund < harmonicKeep * this.peakAt(mag, f0)[0]) continue;
@@ -344,6 +389,8 @@ const CHORDS = [
 const INTERVAL_NAMES = ['unison', 'minor 2nd', 'major 2nd', 'minor 3rd', 'major 3rd', 'perfect 4th', 'tritone', 'perfect 5th', 'minor 6th', 'major 6th', 'minor 7th', 'major 7th'];
 
 // midis: detected MIDI notes. Returns ranked candidates [{name, longName, score}].
+// A fifth in the bass is named in root position (A/E → A): on guitar it is far more often a
+// low root string that wasn't heard than a deliberate second inversion.
 export function nameChord(midis) {
   if (!midis.length) return [];
   const sorted = [...midis].sort((a, b) => a - b);
@@ -353,6 +400,8 @@ export function nameChord(midis) {
   if (pcs.length === 2) {
     const iv = (pcs.find((p) => p !== bass) - bass + 12) % 12;
     if (iv === 7) return [{ name: NOTE_NAMES[bass] + '5', longName: 'power chord', score: 1 }];
+    // A fourth on guitar is nearly always an inverted power chord
+    if (iv === 5) return [{ name: `${NOTE_NAMES[(bass + 5) % 12]}5`, longName: 'power chord (inverted)', score: 0.8 }];
     return [{ name: `${NOTE_NAMES[bass]} + ${NOTE_NAMES[(bass + iv) % 12]}`, longName: INTERVAL_NAMES[iv] + ' (dyad)', score: 0.5 }];
   }
   const out = [];
@@ -366,8 +415,9 @@ export function nameChord(midis) {
         else missing += iv === 7 ? 0.4 : 1; // a dropped 5th is common
       }
       const extra = [...rel].filter((iv) => !ch.iv.includes(iv)).length;
-      const score = hit * 2 - missing * 3 - extra * 2.5 + (root === bass ? 1.5 : 0) - ch.iv.length * 0.1;
-      const slash = root !== bass ? '/' + NOTE_NAMES[bass] : '';
+      const fifthInBass = (bass - root + 12) % 12 === 7 && ch.iv.includes(7);
+      const score = hit * 2 - missing * 3 - extra * 2.5 + (root === bass ? 1.5 : fifthInBass ? 1 : 0) - ch.iv.length * 0.1;
+      const slash = root !== bass && !fifthInBass ? '/' + NOTE_NAMES[bass] : '';
       out.push({ name: NOTE_NAMES[root] + ch.s + slash, longName: `${NOTE_NAMES[root]} ${ch.name}${slash ? ', ' + NOTE_NAMES[bass] + ' in bass' : ''}`, score });
     }
   }
