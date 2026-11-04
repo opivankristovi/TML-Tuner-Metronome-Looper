@@ -4,8 +4,9 @@ Tuner, note/chord analyzer and 3-track loop station for guitar or bass through a
 (or any audio input). It runs in the browser with the Web Audio API and needs no build step
 or dependencies.
 
-**Try it online:**
-- **Desktop:** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/)
+**Try it online:** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/)
+opens a start screen where you pick the desktop or the mobile version. Direct links:
+- **Desktop:** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/desktop/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/desktop/)
 - **Phone:** [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/mobile/). Open it on an iPhone or Android phone and add it to the home screen.
 
 The phone version ([`mobile/`](mobile/README.md)) is a touchscreen fork that installs as an app and works
@@ -30,7 +31,7 @@ The screenshots were captured from synthesized guitar signals.
 
 ## Run
 
-The quickest way is the published page: [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/), in Chromium, Chrome or Firefox.
+The quickest way is the published page: [https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/desktop/](https://opivankristovi.github.io/TML-Tuner-Metronome-Looper/desktop/), in Chromium, Chrome or Firefox.
 Locally, with the iRig HD set up automatically:
 
 ```bash
@@ -39,8 +40,9 @@ Locally, with the iRig HD set up automatically:
 
 The script switches the iRig HD's PipeWire profile to `pro-audio` (by default PipeWire leaves
 it `off`, so it has no input). It then serves the folder on `http://localhost:8765` and opens
-a Chromium app window. You can also run `python3 serve.py` and open `http://localhost:8765`
-in any Chromium or Firefox browser. It must be `localhost`, because microphone access needs a
+the desktop app (`/desktop/`) in a Chromium app window. You can also run `python3 serve.py` and
+open `http://localhost:8765` in any Chromium or Firefox browser; that shows the same start screen
+as the published page. It must be `localhost`, because microphone access needs a
 secure origin. `serve.py` also sends the cross-origin isolation headers that let the loop
 station share its buffers between the audio thread and the UI; a plain static server works,
 but waveforms and export then fall back to copying.
@@ -115,6 +117,8 @@ players monitor through an amp or the iRig's headphone out instead).
 
 | File | What it does |
 |---|---|
+| `index.html` | Start screen: pick the desktop or the mobile version |
+| `desktop/index.html` | Desktop app page (uses `style.css` and `js/` from the repo root) |
 | `js/dsp.js` | FFT, MPM pitch detector, polyphonic detector (iterative harmonic salience with spectral-smoothness subtraction), onset detection, chord naming, fingering search |
 | `js/station-worklet.js` | Loop-station engine on the audio thread: transport, bar-quantized track actions, latency-compensated recording, drum synth |
 | `js/station.js` | Loop-station UI, buffer allocation, waveforms, export, keys |
