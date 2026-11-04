@@ -97,6 +97,8 @@ main { padding: 12px 12px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1
 
 /* tuner */
 .pill-select { border-radius: 20px; padding: 6px 14px; font-size: 14px; }
+.a4-pill { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.a4-pill input { width: 72px; border-radius: 20px; padding: 6px 10px; font-size: 14px; text-align: center; color: var(--text); }
 .tuner-note { text-align: center; height: 104px; line-height: 104px; margin-top: 4px; }
 .big-note { font-size: 96px; font-weight: 700; letter-spacing: -2px; }
 .octave { font-size: 30px; color: var(--muted); vertical-align: super; margin-left: 2px; }

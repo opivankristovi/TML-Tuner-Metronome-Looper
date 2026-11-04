@@ -33,6 +33,7 @@
     <section id="tab-tuner" class="tab">
       <div class="row center">
         <select id="instrument" class="pill-select" aria-label="Instrument"></select>
+        <label class="a4-pill">A4 <input id="a4" type="number" inputmode="decimal" min="415" max="466" step="0.5" aria-label="A4 reference frequency"> Hz</label>
       </div>
       <div class="tuner-note"><span id="tNote" class="big-note">–</span><span id="tOct" class="octave"></span></div>
       <canvas id="gauge" class="gauge"></canvas>
@@ -176,7 +177,6 @@
       <h2>Instrument</h2>
       <div class="card">
         <label class="field">Tuning <select id="instrument2"></select></label>
-        <label class="field">A4 reference <input id="a4" type="number" inputmode="decimal" min="415" max="466" step="0.5"> Hz</label>
       </div>
 
       <h2>Loop timing</h2>
