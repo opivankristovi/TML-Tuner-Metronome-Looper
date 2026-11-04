@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iRig Lab</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎸</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">iRig&nbsp;<b>Lab</b></div>
+
+    <div class="group">
+      <label>Input
+        <select id="device"><option value="">(start to list devices)</option></select>
+      </label>
+      <label>Channel
+        <select id="channel">
+          <option value="mix">Mix</option>
+          <option value="0">Left</option>
+          <option value="1">Right</option>
+        </select>
+      </label>
+      <button id="start" class="primary">Start audio</button>
+    </div>
+
+    <div class="group">
+      <label>Gain <input id="gain" type="range" min="0" max="24" step="0.5" value="0"><output id="gainOut">0 dB</output></label>
+      <div class="meter" title="Input level"><div id="meterFill"></div><div id="meterPeak"></div></div>
+      <span id="clip" class="clip">CLIP</span>
+    </div>
+
+    <div class="group">
+      <label class="check"><input id="monitor" type="checkbox"> Monitor</label>
+      <input id="monitorVol" type="range" min="0" max="1" step="0.01" value="0.8" title="Monitor volume">
+    </div>
+
+    <div class="group">
+      <label>Instrument <select id="instrument"></select></label>
+      <label>A4 <input id="a4" type="number" min="415" max="466" step="0.5" value="440"> Hz</label>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="tuner" class="active">Tuner <kbd>1</kbd></button>
+    <button role="tab" data-tab="analyzer">Note &amp; Chord <kbd>2</kbd></button>
+    <button role="tab" data-tab="looper">Loop Station <kbd>3</kbd></button>
+  </nav>
+
+  <div id="banner" class="banner">Plug your instrument into the iRig HD, then press <b>Start audio</b>.</div>
+
+  <main>
+    <!-- ------------------------------------------------------------ TUNER -->
+    <section id="tab-tuner" class="tab active">
+      <div class="tuner">
+        <div class="tuner-note">
+          <span id="tNote" class="big-note">–</span><span id="tOct" class="octave"></span>
+        </div>
+        <canvas id="gauge" width="760" height="300"></canvas>
+        <div class="readouts">
+          <div><span id="tCents">–</span><small>cents</small></div>
+          <div><span id="tFreq">–</span><small>Hz</small></div>
+          <div><span id="tTarget">–</span><small>target</small></div>
+        </div>
+        <div id="tHint" class="hint">&nbsp;</div>
+        <div class="strings">
+          <button id="stringAuto" class="string active">Auto</button>
+          <div id="stringBtns"></div>
+        </div>
+        <canvas id="history" width="900" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- ANALYZER -->
+    <section id="tab-analyzer" class="tab">
+      <div class="an-controls">
+        <div class="seg" id="anMode">
+          <button data-mode="auto" class="active">Auto</button>
+          <button data-mode="note">Single note</button>
+          <button data-mode="chord">Chord <span class="exp">experimental</span></button>
+        </div>
+        <label class="check"><input id="hold" type="checkbox"> Hold</label>
+        <label title="Higher is stricter: fewer false notes, but quiet strings may be missed">Sensitivity <input id="sens" type="range" min="0.1" max="0.4" step="0.01" value="0.22"></label>
+        <label title="How far above the room's background noise a sound must be before it is analysed. Raise it if fans or hum still trigger notes; lower it if soft playing is missed.">Noise threshold <input id="anGate" type="range" min="3" max="30" step="1"><output id="anGateOut"></output></label>
+        <div class="gate" title="Input level (bar), background noise (grey mark) and threshold (yellow mark)">
+          <div id="gmLevel" class="gate-level"></div><div id="gmFloor" class="gate-floor"></div><div id="gmTh" class="gate-th"></div>
+        </div>
+        <span id="gmState" class="gate-state">Quiet</span>
+      </div>
+
+      <div class="an-main">
+        <div class="an-result">
+          <div id="anName" class="big-chord">–</div>
+          <div id="anLong" class="an-long">Play a note or strum a chord</div>
+          <div id="anExp" class="exp-note" hidden><span class="exp">experimental</span> Chord detection works best with a clean signal (iRig or a mic close to the guitar) and may still get a note wrong.</div>
+          <div id="anNotes" class="chips"></div>
+          <div id="anAlt" class="alts"></div>
+        </div>
+        <div class="an-board">
+          <div class="board-head">
+            <span id="anBoardTitle">Fretboard</span>
+            <span class="voicing">
+              <button id="vPrev" title="Previous voicing">‹</button>
+              <span id="vLabel"></span>
+              <button id="vNext" title="Next voicing">›</button>
+            </span>
+          </div>
+          <svg id="fretboard" class="fretboard"></svg>
+          <div id="anPositions" class="positions"></div>
+        </div>
+      </div>
+
+      <canvas id="spectrum" width="1200" height="200"></canvas>
+
+      <div class="history-strip">
+        <span>History</span>
+        <div id="anHistory"></div>
+        <button id="anHistClear" class="small">Clear</button>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------- LOOP STATION -->
+    <section id="tab-looper" class="tab">
+      <div class="station">
+        <div class="transport">
+          <div class="tgroup">
+            <label>Tempo <input id="bpm" type="number" min="30" max="300" step="1"> BPM</label>
+            <button id="tap" class="small">Tap<kbd>T</kbd></button>
+          </div>
+          <label>Rhythm <select id="rhythm"></select></label>
+          <div class="tgroup">
+            <label class="check"><input id="metro" type="checkbox"> Metronome<kbd>M</kbd></label>
+            <input id="metroVol" type="range" min="0" max="1.5" step="0.01" title="Metronome volume">
+          </div>
+          <label class="check"><input id="countIn" type="checkbox"> 1-bar count-in</label>
+          <label>Start on
+            <select id="quantize">
+              <option value="bar">next bar</option>
+              <option value="beat">next beat</option>
+              <option value="off">immediately</option>
+            </select>
+          </label>
+          <label>Rec length
+            <select id="recBars">
+              <option value="0">free</option>
+              <option value="1">1 bar</option>
+              <option value="2">2 bars</option>
+              <option value="4">4 bars</option>
+              <option value="8">8 bars</option>
+              <option value="16">16 bars</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="transport bar2">
+          <button id="playAll" class="playall">▶ Play all<kbd>Space</kbd></button>
+          <div id="beatLights" class="beats"></div>
+          <div id="barPos" class="barpos">Stopped</div>
+          <span id="tempoLock" class="lockmsg"></span>
+          <span class="spacer"></span>
+          <label>Loops <input id="lVol" type="range" min="0" max="1.5" step="0.01"></label>
+          <label>Latency offset <input id="lLat" type="range" min="-50" max="150" step="1"><output id="lLatOut"></output></label>
+        </div>
+
+        <div id="tracks" class="tracks"></div>
+
+        <p class="help">
+          Each track: <b>Q</b>/<b>W</b>/<b>E</b> cycles Rec → Play → Overdub → Play, <b>A</b>/<b>S</b>/<b>D</b> stops it.
+          <b>Space</b> starts/stops everything, <b>Z</b> / <b>Shift+Z</b> undo/redo and <b>Del</b> clears the selected track,
+          <b>M</b> toggles the metronome, <b>T</b> taps the tempo.
+          Actions wait for the next bar (or beat), so every loop is whole bars and the tracks stay in sync; pressing up to
+          ~60&nbsp;ms after the downbeat still counts as on time. Press again before the bar to cancel. Loops can be up to 90&nbsp;seconds.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/app.js"></script>
+</body>
+</html>

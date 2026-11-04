@@ -25,5 +25,5 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     root = os.path.dirname(os.path.abspath(__file__))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), functools.partial(Handler, directory=root))
-    print(f"iRig Lab on http://localhost:{port}/")
+    print(f"iRig Lab on http://localhost:{port}/  (desktop: /desktop/, mobile: /mobile/)")
     server.serve_forever()

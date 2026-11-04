@@ -25,7 +25,7 @@ export function createStation({ settings, save, banner }) {
   async function attach(ctx, input) {
     s.ctx = ctx;
     s.shared = globalThis.crossOriginIsolated === true;
-    await ctx.audioWorklet.addModule('js/station-worklet.js');
+    await ctx.audioWorklet.addModule(new URL('station-worklet.js', import.meta.url));
     s.node = new AudioWorkletNode(ctx, 'station', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 1, channelCountMode: 'explicit' });
     input.connect(s.node);
     s.node.connect(ctx.destination);

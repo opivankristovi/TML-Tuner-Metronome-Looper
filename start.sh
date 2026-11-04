@@ -18,7 +18,7 @@ SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 0.5
 
-URL="http://localhost:$PORT/"
+URL="http://localhost:$PORT/desktop/"
 BROWSER="$(command -v chromium || command -v chromium-browser || command -v google-chrome || true)"
 if [ -n "$BROWSER" ]; then
   # Separate profile so this window owns its process (and remembers the mic permission)
